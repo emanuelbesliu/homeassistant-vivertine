@@ -21,6 +21,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from .const import (
     DOMAIN,
     CONF_FAVORITE_CLASSES,
+    CONF_FAVORITE_INSTRUCTORS,
     CONF_NOTIFY_SERVICE,
     CONF_LOW_SPOTS_THRESHOLD,
     DEFAULT_LOW_SPOTS_THRESHOLD,
@@ -67,6 +68,21 @@ class VivertineClassAlerts:
         }
 
     @property
+    def _favorite_instructor_names(self) -> set[str]:
+        """Get the set of favorite instructor names (lowercased)."""
+        raw = self._entry.options.get(
+            CONF_FAVORITE_INSTRUCTORS,
+            self._entry.data.get(CONF_FAVORITE_INSTRUCTORS, ""),
+        )
+        if not raw:
+            return set()
+        return {
+            name.strip().lower()
+            for name in raw.split(",")
+            if name.strip()
+        }
+
+    @property
     def _notify_service(self) -> str | None:
         """Get the configured notification service target."""
         service = self._entry.options.get(
@@ -99,7 +115,8 @@ class VivertineClassAlerts:
     def _on_update(self) -> None:
         """Handle coordinator data update — check for class changes."""
         favorites = self._favorite_names
-        if not favorites:
+        fav_instructors = self._favorite_instructor_names
+        if not favorites and not fav_instructors:
             return
 
         entry_data = self._hass.data.get(DOMAIN, {}).get(self._entry.entry_id)
@@ -115,7 +132,7 @@ class VivertineClassAlerts:
         all_classes = coordinator.data.get(DATA_CLASSES, [])
 
         current_classes = self._build_class_snapshot(
-            all_classes, favorites
+            all_classes, favorites, fav_instructors
         )
 
         if self._previous_classes:
@@ -127,12 +144,22 @@ class VivertineClassAlerts:
         self,
         classes: list[dict[str, Any]],
         favorites: set[str],
+        fav_instructors: set[str],
     ) -> dict[int, dict[str, Any]]:
-        """Build a snapshot of favorite classes keyed by class ID."""
+        """Build a snapshot of monitored classes keyed by class ID.
+
+        A class is included if its class_type_name matches a favorite class
+        OR its instructor_name matches a favorite instructor.
+        """
         snapshot = {}
         for cls in classes:
             class_name = (cls.get("class_type_name") or "").lower()
-            if class_name not in favorites:
+            instructor = (cls.get("instructor_name") or "").lower()
+            is_fav_class = class_name in favorites if favorites else False
+            is_fav_instructor = (
+                instructor in fav_instructors if fav_instructors else False
+            )
+            if not is_fav_class and not is_fav_instructor:
                 continue
             cls_id = cls.get("id")
             if cls_id is None:

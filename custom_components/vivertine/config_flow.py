@@ -15,6 +15,7 @@ from .const import (
     CONF_PASSWORD,
     CONF_UPDATE_INTERVAL,
     CONF_FAVORITE_CLASSES,
+    CONF_FAVORITE_INSTRUCTORS,
     CONF_NOTIFY_SERVICE,
     CONF_LOW_SPOTS_THRESHOLD,
     DEFAULT_UPDATE_INTERVAL,
@@ -103,6 +104,7 @@ class VivertineOptionsFlowHandler(config_entries.OptionsFlow):
     Options:
     - Update interval
     - Favorite class types (comma-separated names)
+    - Favorite instructors (comma-separated names)
     - Notification service target
     - Low spots threshold
     """
@@ -123,6 +125,10 @@ class VivertineOptionsFlowHandler(config_entries.OptionsFlow):
         current_favorites = self.config_entry.options.get(
             CONF_FAVORITE_CLASSES,
             self.config_entry.data.get(CONF_FAVORITE_CLASSES, ""),
+        )
+        current_fav_instructors = self.config_entry.options.get(
+            CONF_FAVORITE_INSTRUCTORS,
+            self.config_entry.data.get(CONF_FAVORITE_INSTRUCTORS, ""),
         )
         current_notify = self.config_entry.options.get(
             CONF_NOTIFY_SERVICE,
@@ -149,6 +155,10 @@ class VivertineOptionsFlowHandler(config_entries.OptionsFlow):
                 vol.Optional(
                     CONF_FAVORITE_CLASSES,
                     default=current_favorites,
+                ): str,
+                vol.Optional(
+                    CONF_FAVORITE_INSTRUCTORS,
+                    default=current_fav_instructors,
                 ): str,
                 vol.Optional(
                     CONF_NOTIFY_SERVICE,

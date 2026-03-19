@@ -46,6 +46,7 @@ After setup, configure options via the integration's **Configure** button:
 |--------|-------------|---------|
 | Update interval | Data fetch frequency (60-3600s) | 300s |
 | Favorite classes | Comma-separated class names to monitor | *(empty)* |
+| Favorite instructors | Comma-separated instructor names to monitor | *(empty)* |
 | Notification service | HA notify service target (e.g., `mobile_app_iphone`) | *(empty)* |
 | Low spots threshold | Alert when spots drop below this | 5 |
 
@@ -58,6 +59,8 @@ After setup, configure options via the integration's **Configure** button:
 | `sensor.vivertine_membership_days_left` | Days until membership expires |
 | `sensor.vivertine_membership_plan` | Active plan name |
 | `sensor.vivertine_next_class` | Next upcoming class name and instructor |
+| `sensor.vivertine_next_favorite_class` | Next upcoming class matching favorite class types |
+| `sensor.vivertine_next_favorite_instructor_class` | Next upcoming class by a favorite instructor |
 | `sensor.vivertine_todays_classes_count` | Number of classes today |
 | `sensor.vivertine_weekly_visits` | Club visits in the last 7 days |
 | `sensor.vivertine_monthly_visits` | Club visits in the last 30 days |
@@ -67,7 +70,7 @@ After setup, configure options via the integration's **Configure** button:
 
 ## Alert Events
 
-When favorite classes are configured, the integration fires these HA events:
+When favorite classes or favorite instructors are configured, the integration fires these HA events:
 
 | Event | Description |
 |-------|-------------|

@@ -28,6 +28,7 @@ CONF_EMAIL = "email"
 CONF_PASSWORD = "password"
 CONF_UPDATE_INTERVAL = "update_interval"
 CONF_FAVORITE_CLASSES = "favorite_classes"
+CONF_FAVORITE_INSTRUCTORS = "favorite_instructors"
 CONF_NOTIFY_SERVICE = "notify_service"
 CONF_LOW_SPOTS_THRESHOLD = "low_spots_threshold"
 
@@ -61,6 +62,8 @@ DATA_OPENING_HOURS = "opening_hours"
 DATA_UPCOMING_CLASSES = "upcoming_classes"
 DATA_TODAYS_CLASSES = "todays_classes"
 DATA_NEXT_CLASS = "next_class"
+DATA_NEXT_FAVORITE_CLASS = "next_favorite_class"
+DATA_NEXT_FAVORITE_INSTRUCTOR_CLASS = "next_favorite_instructor_class"
 DATA_WEEKLY_VISITS = "weekly_visits"
 DATA_MONTHLY_VISITS = "monthly_visits"
 
@@ -81,6 +84,8 @@ SENSOR_WEEKLY_VISITS = "weekly_visits"
 SENSOR_MONTHLY_VISITS = "monthly_visits"
 SENSOR_TOTAL_VISITS = "total_visits"
 SENSOR_ACTIVE_BOOKINGS = "active_bookings"
+SENSOR_NEXT_FAVORITE_CLASS = "next_favorite_class"
+SENSOR_NEXT_FAVORITE_INSTRUCTOR_CLASS = "next_favorite_instructor_class"
 
 SENSOR_TYPES = {
     SENSOR_MEMBERSHIP_STATUS: {
@@ -141,6 +146,18 @@ SENSOR_TYPES = {
         "name": "Active Bookings",
         "icon": "mdi:bookmark-check",
         "unit": "bookings",
+        "device_class": None,
+    },
+    SENSOR_NEXT_FAVORITE_CLASS: {
+        "name": "Next Favorite Class",
+        "icon": "mdi:heart",
+        "unit": None,
+        "device_class": None,
+    },
+    SENSOR_NEXT_FAVORITE_INSTRUCTOR_CLASS: {
+        "name": "Next Favorite Instructor Class",
+        "icon": "mdi:account-heart",
+        "unit": None,
         "device_class": None,
     },
 }

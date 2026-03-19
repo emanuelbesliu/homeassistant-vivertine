@@ -20,6 +20,8 @@ from .const import (
     DOMAIN,
     DEFAULT_UPDATE_INTERVAL,
     CONF_UPDATE_INTERVAL,
+    CONF_FAVORITE_CLASSES,
+    CONF_FAVORITE_INSTRUCTORS,
     CONTRACT_STATUS_CURRENT,
     DATA_ACCOUNT,
     DATA_CONTRACTS,
@@ -36,6 +38,8 @@ from .const import (
     DATA_UPCOMING_CLASSES,
     DATA_TODAYS_CLASSES,
     DATA_NEXT_CLASS,
+    DATA_NEXT_FAVORITE_CLASS,
+    DATA_NEXT_FAVORITE_INSTRUCTOR_CLASS,
     DATA_WEEKLY_VISITS,
     DATA_MONTHLY_VISITS,
     VIVERTINE_CLUB_ID,
@@ -149,6 +153,15 @@ class VivertineDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         upcoming = self._get_upcoming_classes(enriched_classes)
         todays = self._get_todays_classes(enriched_classes)
         next_class = upcoming[0] if upcoming else None
+
+        # Next favorite class (filtered by favorite class type names)
+        next_favorite_class = self._get_next_favorite_class(upcoming)
+
+        # Next favorite instructor class (filtered by favorite instructor names)
+        next_fav_instructor_class = self._get_next_favorite_instructor_class(
+            upcoming
+        )
+
         weekly_visits = self._count_visits_in_range(
             timeline, now - timedelta(days=7), now
         )
@@ -172,6 +185,8 @@ class VivertineDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             DATA_UPCOMING_CLASSES: upcoming,
             DATA_TODAYS_CLASSES: todays,
             DATA_NEXT_CLASS: next_class,
+            DATA_NEXT_FAVORITE_CLASS: next_favorite_class,
+            DATA_NEXT_FAVORITE_INSTRUCTOR_CLASS: next_fav_instructor_class,
             DATA_WEEKLY_VISITS: weekly_visits,
             DATA_MONTHLY_VISITS: monthly_visits,
         }
@@ -375,6 +390,54 @@ class VivertineDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         todays.sort(key=lambda c: c.get("_parsed_start", datetime.now()))
         return todays
+
+    def _get_next_favorite_class(
+        self,
+        upcoming: list[dict[str, Any]],
+    ) -> dict[str, Any] | None:
+        """Get the next upcoming class matching a favorite class type."""
+        raw = self.entry.options.get(
+            CONF_FAVORITE_CLASSES,
+            self.entry.data.get(CONF_FAVORITE_CLASSES, ""),
+        )
+        if not raw:
+            return None
+        favorites = {
+            name.strip().lower()
+            for name in raw.split(",")
+            if name.strip()
+        }
+        if not favorites:
+            return None
+        for cls in upcoming:
+            class_name = (cls.get("class_type_name") or "").lower()
+            if class_name in favorites:
+                return cls
+        return None
+
+    def _get_next_favorite_instructor_class(
+        self,
+        upcoming: list[dict[str, Any]],
+    ) -> dict[str, Any] | None:
+        """Get the next upcoming class taught by a favorite instructor."""
+        raw = self.entry.options.get(
+            CONF_FAVORITE_INSTRUCTORS,
+            self.entry.data.get(CONF_FAVORITE_INSTRUCTORS, ""),
+        )
+        if not raw:
+            return None
+        favorites = {
+            name.strip().lower()
+            for name in raw.split(",")
+            if name.strip()
+        }
+        if not favorites:
+            return None
+        for cls in upcoming:
+            instructor = (cls.get("instructor_name") or "").lower()
+            if instructor in favorites:
+                return cls
+        return None
 
     @staticmethod
     def _count_visits_in_range(

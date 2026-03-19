@@ -31,12 +31,14 @@
         "data": {
           "update_interval": "Update interval (seconds)",
           "favorite_classes": "Favorite classes (comma-separated)",
+          "favorite_instructors": "Favorite instructors (comma-separated)",
           "notify_service": "Notification service target",
           "low_spots_threshold": "Low spots alert threshold"
         },
         "data_description": {
           "update_interval": "How often to fetch new data (60-3600 seconds)",
           "favorite_classes": "Class type names to monitor, e.g. 'Cycling, Yoga, TRX'",
+          "favorite_instructors": "Instructor names to monitor, e.g. 'Ana Popescu, Mihai Ion'",
           "notify_service": "HA notify service name, e.g. 'mobile_app_iphone' (leave empty to disable)",
           "low_spots_threshold": "Alert when available spots drop below this number (1-30)"
         }

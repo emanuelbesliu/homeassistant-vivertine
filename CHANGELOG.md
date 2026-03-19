@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.2 (2026-03-19)
+
+### Added
+- New sensor: `next_favorite_class` — shows the next upcoming class matching configured favorite class types
+- New sensor: `next_favorite_instructor_class` — shows the next upcoming class taught by a configured favorite instructor
+- New option: **Favorite instructors** — comma-separated instructor names to monitor (same pattern as favorite classes)
+- Alerts now also monitor classes taught by favorite instructors (cancellation, time change, instructor change, low spots)
+
 ## 1.0.1 (2026-03-19)
 
 ### Fixed

@@ -22,6 +22,8 @@ from .const import (
     SENSOR_MEMBERSHIP_DAYS_LEFT,
     SENSOR_MEMBERSHIP_PLAN,
     SENSOR_NEXT_CLASS,
+    SENSOR_NEXT_FAVORITE_CLASS,
+    SENSOR_NEXT_FAVORITE_INSTRUCTOR_CLASS,
     SENSOR_TODAYS_CLASSES,
     SENSOR_WEEKLY_VISITS,
     SENSOR_MONTHLY_VISITS,
@@ -32,6 +34,8 @@ from .const import (
     DATA_UPCOMING_CLASSES,
     DATA_TODAYS_CLASSES,
     DATA_NEXT_CLASS,
+    DATA_NEXT_FAVORITE_CLASS,
+    DATA_NEXT_FAVORITE_INSTRUCTOR_CLASS,
     DATA_WEEKLY_VISITS,
     DATA_MONTHLY_VISITS,
     DATA_TIMELINE,
@@ -187,6 +191,22 @@ class VivertineSensor(
             ]
             return len(active)
 
+        if key == SENSOR_NEXT_FAVORITE_CLASS:
+            next_fav = data.get(DATA_NEXT_FAVORITE_CLASS)
+            if next_fav:
+                name = next_fav.get("class_type_name", "Unknown")
+                instructor = next_fav.get("instructor_name", "")
+                return f"{name} ({instructor})" if instructor else name
+            return "None"
+
+        if key == SENSOR_NEXT_FAVORITE_INSTRUCTOR_CLASS:
+            next_fav_inst = data.get(DATA_NEXT_FAVORITE_INSTRUCTOR_CLASS)
+            if next_fav_inst:
+                name = next_fav_inst.get("class_type_name", "Unknown")
+                instructor = next_fav_inst.get("instructor_name", "")
+                return f"{name} ({instructor})" if instructor else name
+            return "None"
+
         return None
 
     @property
@@ -276,6 +296,32 @@ class VivertineSensor(
                     }
                 )
             attrs["recent_visits"] = recent
+
+        elif key == SENSOR_NEXT_FAVORITE_CLASS:
+            next_fav = data.get(DATA_NEXT_FAVORITE_CLASS)
+            if next_fav:
+                attrs["class_name"] = next_fav.get("class_type_name")
+                attrs["instructor"] = next_fav.get("instructor_name")
+                attrs["start_time"] = next_fav.get("startDate")
+                attrs["end_time"] = next_fav.get("endDate")
+                attrs["zone"] = next_fav.get("clubZone")
+                attrs["available_spots"] = next_fav.get("available_spots")
+                attrs["attendees"] = next_fav.get("attendeesCount")
+                attrs["limit"] = next_fav.get("attendeesLimit")
+
+        elif key == SENSOR_NEXT_FAVORITE_INSTRUCTOR_CLASS:
+            next_fav_inst = data.get(DATA_NEXT_FAVORITE_INSTRUCTOR_CLASS)
+            if next_fav_inst:
+                attrs["class_name"] = next_fav_inst.get("class_type_name")
+                attrs["instructor"] = next_fav_inst.get("instructor_name")
+                attrs["start_time"] = next_fav_inst.get("startDate")
+                attrs["end_time"] = next_fav_inst.get("endDate")
+                attrs["zone"] = next_fav_inst.get("clubZone")
+                attrs["available_spots"] = next_fav_inst.get(
+                    "available_spots"
+                )
+                attrs["attendees"] = next_fav_inst.get("attendeesCount")
+                attrs["limit"] = next_fav_inst.get("attendeesLimit")
 
         return attrs
 
