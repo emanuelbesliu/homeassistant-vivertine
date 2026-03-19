@@ -1,0 +1,46 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Vivertine Gym",
+        "description": "Connect to your Vivertine (PerfectGym) account to monitor your membership, classes, and visits.",
+        "data": {
+          "email": "Email",
+          "password": "Password",
+          "update_interval": "Update interval (seconds)"
+        },
+        "data_description": {
+          "email": "Your Vivertine / PerfectGym account email",
+          "password": "Your Vivertine / PerfectGym account password",
+          "update_interval": "How often to fetch new data (60-3600 seconds, default 300)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to PerfectGym API. Please try again later.",
+      "invalid_auth": "Invalid email or password. Please check your credentials."
+    },
+    "abort": {
+      "already_configured": "This Vivertine account is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Vivertine Gym Options",
+        "data": {
+          "update_interval": "Update interval (seconds)",
+          "favorite_classes": "Favorite classes (comma-separated)",
+          "notify_service": "Notification service target",
+          "low_spots_threshold": "Low spots alert threshold"
+        },
+        "data_description": {
+          "update_interval": "How often to fetch new data (60-3600 seconds)",
+          "favorite_classes": "Class type names to monitor, e.g. 'Cycling, Yoga, TRX'",
+          "notify_service": "HA notify service name, e.g. 'mobile_app_iphone' (leave empty to disable)",
+          "low_spots_threshold": "Alert when available spots drop below this number (1-30)"
+        }
+      }
+    }
+  }
+}

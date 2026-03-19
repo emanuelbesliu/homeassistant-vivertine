@@ -1,0 +1,15 @@
+{
+  "domain": "vivertine",
+  "name": "Vivertine Gym",
+  "codeowners": [
+    "@emanuelbesliu"
+  ],
+  "config_flow": true,
+  "documentation": "https://github.com/emanuelbesliu/homeassistant-vivertine",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/emanuelbesliu/homeassistant-vivertine/issues",
+  "requirements": [
+    "requests>=2.31.0"
+  ],
+  "version": "1.0.0"
+}

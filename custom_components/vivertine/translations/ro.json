@@ -1,0 +1,46 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Vivertine Gym",
+        "description": "Conectează-te la contul tău Vivertine (PerfectGym) pentru a monitoriza abonamentul, clasele și vizitele.",
+        "data": {
+          "email": "Email",
+          "password": "Parolă",
+          "update_interval": "Interval actualizare (secunde)"
+        },
+        "data_description": {
+          "email": "Adresa de email a contului Vivertine / PerfectGym",
+          "password": "Parola contului Vivertine / PerfectGym",
+          "update_interval": "Cât de des să se actualizeze datele (60-3600 secunde, implicit 300)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Nu se poate conecta la API-ul PerfectGym. Încercați din nou mai târziu.",
+      "invalid_auth": "Email sau parolă incorectă. Verificați datele de autentificare."
+    },
+    "abort": {
+      "already_configured": "Acest cont Vivertine este deja configurat."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opțiuni Vivertine Gym",
+        "data": {
+          "update_interval": "Interval actualizare (secunde)",
+          "favorite_classes": "Clase favorite (separate prin virgulă)",
+          "notify_service": "Serviciu notificări",
+          "low_spots_threshold": "Prag alertă locuri puține"
+        },
+        "data_description": {
+          "update_interval": "Cât de des să se actualizeze datele (60-3600 secunde)",
+          "favorite_classes": "Numele claselor de monitorizat, ex: 'Cycling, Yoga, TRX'",
+          "notify_service": "Numele serviciului de notificări HA, ex: 'mobile_app_iphone' (gol = dezactivat)",
+          "low_spots_threshold": "Alertă când locurile disponibile scad sub acest număr (1-30)"
+        }
+      }
+    }
+  }
+}
