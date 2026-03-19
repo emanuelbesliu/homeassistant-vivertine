@@ -112,7 +112,9 @@ class VivertineAPI:
                 f"Invalid JSON in login response: {err}"
             ) from err
 
-        token = data.get("token")
+        # Token is nested under "data" key: {"data": {"token": "..."}}
+        inner = data.get("data", {}) if isinstance(data.get("data"), dict) else {}
+        token = inner.get("token") or data.get("token")
         if not token:
             raise VivertineAuthError(
                 "Login response did not contain a token"
@@ -192,11 +194,22 @@ class VivertineAPI:
             )
 
         try:
-            return resp.json()
+            result = resp.json()
         except ValueError as err:
             raise VivertineApiError(
                 f"Invalid JSON from {endpoint}: {err}"
             ) from err
+
+        # API wraps responses in {"data": ..., "errors": ...}
+        if isinstance(result, dict) and "data" in result:
+            errors = result.get("errors")
+            if errors:
+                _LOGGER.warning(
+                    "API returned errors from %s: %s", endpoint, errors
+                )
+            return result["data"]
+
+        return result
 
     # ------------------------------------------------------------------
     # Account & membership
@@ -204,7 +217,11 @@ class VivertineAPI:
 
     def get_account(self) -> dict[str, Any]:
         """Fetch user account/profile info."""
-        return self._get(ENDPOINT_ACCOUNT)
+        data = self._get(ENDPOINT_ACCOUNT)
+        # API returns a list with a single account object
+        if isinstance(data, list) and data:
+            return data[0]
+        return data if isinstance(data, dict) else {}
 
     def get_contracts(self) -> list[dict[str, Any]]:
         """Fetch all user contracts (membership subscriptions)."""
