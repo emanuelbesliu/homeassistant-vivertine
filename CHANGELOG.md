@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.1 (2026-03-19)
+
+### Fixed
+- Fix authentication: PerfectGym API wraps all responses in a `{"data": ..., "errors": ...}` envelope — token extraction and all data parsing now correctly unwraps this
+- Fix account endpoint handling: Account API returns a list with a single object, now extracted properly
+- Fix alerts.py: use DATA_CLASSES constant instead of hardcoded string, remove unused parameter
+
 ## 1.0.0 (2026-03-19)
 
 ### Added
