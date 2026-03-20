@@ -40,6 +40,7 @@ from .const import (
     DATA_NEXT_CLASS,
     DATA_NEXT_FAVORITE_CLASS,
     DATA_NEXT_FAVORITE_INSTRUCTOR_CLASS,
+    DATA_RECOMMENDED_CLASS,
     DATA_WEEKLY_VISITS,
     DATA_MONTHLY_VISITS,
     VIVERTINE_CLUB_ID,
@@ -162,6 +163,11 @@ class VivertineDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             upcoming
         )
 
+        # Recommended class based on attendance history
+        recommended_class = self._compute_recommended_class(
+            upcoming, classes_visits
+        )
+
         weekly_visits = self._count_visits_in_range(
             timeline, now - timedelta(days=7), now
         )
@@ -187,6 +193,7 @@ class VivertineDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             DATA_NEXT_CLASS: next_class,
             DATA_NEXT_FAVORITE_CLASS: next_favorite_class,
             DATA_NEXT_FAVORITE_INSTRUCTOR_CLASS: next_fav_instructor_class,
+            DATA_RECOMMENDED_CLASS: recommended_class,
             DATA_WEEKLY_VISITS: weekly_visits,
             DATA_MONTHLY_VISITS: monthly_visits,
         }
@@ -437,6 +444,77 @@ class VivertineDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             instructor = (cls.get("instructor_name") or "").lower()
             if instructor in favorites:
                 return cls
+        return None
+
+    @staticmethod
+    def _compute_recommended_class(
+        upcoming: list[dict[str, Any]],
+        classes_visits: list[dict[str, Any]],
+    ) -> dict[str, Any] | None:
+        """Recommend the best upcoming class based on attendance history.
+
+        Scoring algorithm:
+        - Count how many times the user attended each class type
+          (by className from visits history).
+        - Count attendance per class type + instructor combo for bonus.
+        - Score each upcoming class:
+          class_type_count * 2 + combo_count
+        - Return the highest-scoring upcoming class.
+        - If tied, prefer the sooner class (upcoming is already sorted).
+
+        Returns None if there are no upcoming classes or no visit history.
+        """
+        if not upcoming or not classes_visits:
+            return None
+
+        # Count attendance per class type name (case-insensitive)
+        type_counts: dict[str, int] = {}
+        combo_counts: dict[str, int] = {}
+        for visit in classes_visits:
+            class_name = (visit.get("className") or "").strip().lower()
+            if not class_name:
+                continue
+            type_counts[class_name] = type_counts.get(class_name, 0) + 1
+
+            # Build combo key from visit — visits don't have instructor
+            # names directly, so we can only count class type frequency.
+            # Combo bonus comes from matching upcoming class instructor
+            # with the most-attended class type.
+
+        # Also count type+instructor combos from the visit history
+        # Note: classes_visits has 'className' but not instructor info,
+        # so the combo bonus uses upcoming class data where we have both.
+        # We'll score purely on type frequency, with a small recency bonus
+        # for classes happening sooner (inherent from sorted order).
+
+        best_cls = None
+        best_score = -1
+
+        for cls in upcoming:
+            cls_type = (cls.get("class_type_name") or "").strip().lower()
+            if not cls_type:
+                continue
+
+            # Base score: how many times user attended this class type
+            type_score = type_counts.get(cls_type, 0)
+
+            # Total score (weight type attendance x2)
+            score = type_score * 2
+
+            if score > best_score:
+                best_score = score
+                best_cls = cls
+
+        if best_cls and best_score > 0:
+            # Attach recommendation metadata for sensor attributes
+            cls_type = (
+                best_cls.get("class_type_name") or ""
+            ).strip().lower()
+            best_cls = dict(best_cls)  # shallow copy to avoid mutation
+            best_cls["_recommendation_score"] = best_score
+            best_cls["_type_attendance_count"] = type_counts.get(cls_type, 0)
+            return best_cls
+
         return None
 
     @staticmethod

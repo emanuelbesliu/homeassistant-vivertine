@@ -1,7 +1,7 @@
 """Sensor platform for the Vivertine Gym integration."""
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -24,6 +24,7 @@ from .const import (
     SENSOR_NEXT_CLASS,
     SENSOR_NEXT_FAVORITE_CLASS,
     SENSOR_NEXT_FAVORITE_INSTRUCTOR_CLASS,
+    SENSOR_RECOMMENDED_CLASS,
     SENSOR_TODAYS_CLASSES,
     SENSOR_WEEKLY_VISITS,
     SENSOR_MONTHLY_VISITS,
@@ -36,6 +37,7 @@ from .const import (
     DATA_NEXT_CLASS,
     DATA_NEXT_FAVORITE_CLASS,
     DATA_NEXT_FAVORITE_INSTRUCTOR_CLASS,
+    DATA_RECOMMENDED_CLASS,
     DATA_WEEKLY_VISITS,
     DATA_MONTHLY_VISITS,
     DATA_TIMELINE,
@@ -46,6 +48,64 @@ from .const import (
 from .coordinator import VivertineDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+# Romanian day-of-week names for class display
+_RO_DAYS = {
+    0: "Luni",
+    1: "Marți",
+    2: "Miercuri",
+    3: "Joi",
+    4: "Vineri",
+    5: "Sâmbătă",
+    6: "Duminică",
+}
+
+
+def _format_class_state(cls_data: dict[str, Any] | None) -> str:
+    """Format a class dict into a human-readable sensor state.
+
+    Format: "ClassName — Instructor @ HH:MM"        (if today)
+            "ClassName — Instructor @ Mâine HH:MM"  (if tomorrow)
+            "ClassName — Instructor @ Ziua HH:MM"   (if further out)
+
+    Returns "None" if cls_data is None.
+    """
+    if not cls_data:
+        return "None"
+
+    name = cls_data.get("class_type_name", "Unknown")
+    instructor = cls_data.get("instructor_name", "")
+
+    # Build the base: "Name — Instructor"
+    if instructor and instructor != "N/A":
+        base = f"{name} — {instructor}"
+    else:
+        base = name
+
+    # Parse start time for the "@ ..." suffix
+    start_str = cls_data.get("startDate")
+    if not start_str:
+        return base
+
+    try:
+        start_dt = datetime.fromisoformat(
+            start_str.replace("Z", "+00:00")
+        ).replace(tzinfo=None)
+    except (ValueError, TypeError):
+        return base
+
+    now = datetime.now()
+    today = now.date()
+    class_date = start_dt.date()
+    time_str = start_dt.strftime("%H:%M")
+
+    if class_date == today:
+        return f"{base} @ {time_str}"
+    elif class_date == today + timedelta(days=1):
+        return f"{base} @ Mâine {time_str}"
+    else:
+        day_name = _RO_DAYS.get(class_date.weekday(), class_date.strftime("%d/%m"))
+        return f"{base} @ {day_name} {time_str}"
 
 
 async def async_setup_entry(
@@ -161,11 +221,7 @@ class VivertineSensor(
 
         if key == SENSOR_NEXT_CLASS:
             next_cls = data.get(DATA_NEXT_CLASS)
-            if next_cls:
-                name = next_cls.get("class_type_name", "Unknown")
-                instructor = next_cls.get("instructor_name", "")
-                return f"{name} ({instructor})" if instructor else name
-            return "None"
+            return _format_class_state(next_cls)
 
         if key == SENSOR_TODAYS_CLASSES:
             todays = data.get(DATA_TODAYS_CLASSES, [])
@@ -193,19 +249,15 @@ class VivertineSensor(
 
         if key == SENSOR_NEXT_FAVORITE_CLASS:
             next_fav = data.get(DATA_NEXT_FAVORITE_CLASS)
-            if next_fav:
-                name = next_fav.get("class_type_name", "Unknown")
-                instructor = next_fav.get("instructor_name", "")
-                return f"{name} ({instructor})" if instructor else name
-            return "None"
+            return _format_class_state(next_fav)
 
         if key == SENSOR_NEXT_FAVORITE_INSTRUCTOR_CLASS:
             next_fav_inst = data.get(DATA_NEXT_FAVORITE_INSTRUCTOR_CLASS)
-            if next_fav_inst:
-                name = next_fav_inst.get("class_type_name", "Unknown")
-                instructor = next_fav_inst.get("instructor_name", "")
-                return f"{name} ({instructor})" if instructor else name
-            return "None"
+            return _format_class_state(next_fav_inst)
+
+        if key == SENSOR_RECOMMENDED_CLASS:
+            recommended = data.get(DATA_RECOMMENDED_CLASS)
+            return _format_class_state(recommended)
 
         return None
 
@@ -322,6 +374,26 @@ class VivertineSensor(
                 )
                 attrs["attendees"] = next_fav_inst.get("attendeesCount")
                 attrs["limit"] = next_fav_inst.get("attendeesLimit")
+
+        elif key == SENSOR_RECOMMENDED_CLASS:
+            recommended = data.get(DATA_RECOMMENDED_CLASS)
+            if recommended:
+                attrs["class_name"] = recommended.get("class_type_name")
+                attrs["instructor"] = recommended.get("instructor_name")
+                attrs["start_time"] = recommended.get("startDate")
+                attrs["end_time"] = recommended.get("endDate")
+                attrs["zone"] = recommended.get("clubZone")
+                attrs["available_spots"] = recommended.get(
+                    "available_spots"
+                )
+                attrs["attendees"] = recommended.get("attendeesCount")
+                attrs["limit"] = recommended.get("attendeesLimit")
+                attrs["recommendation_score"] = recommended.get(
+                    "_recommendation_score"
+                )
+                attrs["type_attendance_count"] = recommended.get(
+                    "_type_attendance_count"
+                )
 
         return attrs
 

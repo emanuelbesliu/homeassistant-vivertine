@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.6 (2026-03-20)
+
+### Added
+- New sensor: `recommended_class` — recommends the best upcoming class based on your attendance history (scores by class type frequency)
+- Improved class sensor display format for all class sensors (`next_class`, `next_favorite_class`, `next_favorite_instructor_class`, `recommended_class`):
+  - Shows date and time alongside class name and instructor
+  - Format: `"ClassName — Instructor @ 18:00"` (today), `"ClassName — Instructor @ Mâine 18:00"` (tomorrow), `"ClassName — Instructor @ Miercuri 18:00"` (other days)
+  - Day names in Romanian
+- `recommended_class` sensor attributes include `recommendation_score` and `type_attendance_count`
+- README: added Buy Me a Coffee badges, new sensor documentation, display format documentation, disclaimer section
+
 ## 1.0.5 (2026-03-20)
 
 ### Added
