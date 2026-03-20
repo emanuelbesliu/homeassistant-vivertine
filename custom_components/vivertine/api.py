@@ -22,8 +22,6 @@ from .const import (
     ENDPOINT_BOOKINGS,
     ENDPOINT_INSTRUCTORS,
     ENDPOINT_TIMELINE,
-    ENDPOINT_WHO_IS_IN_COUNT,
-    ENDPOINT_CLUB_LIMITS,
     ENDPOINT_BOOK_CLASS,
     ENDPOINT_CANCEL_BOOKING,
     ENDPOINT_NOTIFICATIONS,
@@ -378,20 +376,6 @@ class VivertineAPI:
     def get_timeline(self) -> list[dict[str, Any]]:
         """Fetch user's timeline (club visits / check-ins)."""
         data = self._get(ENDPOINT_TIMELINE)
-        return data if isinstance(data, list) else []
-
-    # ------------------------------------------------------------------
-    # Gym occupancy
-    # ------------------------------------------------------------------
-
-    def get_who_is_in_count(self) -> list[dict[str, Any]]:
-        """Fetch real-time member count in each club."""
-        data = self._get(ENDPOINT_WHO_IS_IN_COUNT)
-        return data if isinstance(data, list) else []
-
-    def get_club_limits(self) -> list[dict[str, Any]]:
-        """Fetch club capacity limits and current occupancy."""
-        data = self._get(ENDPOINT_CLUB_LIMITS)
         return data if isinstance(data, list) else []
 
     # ------------------------------------------------------------------

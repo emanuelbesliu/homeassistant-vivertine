@@ -30,9 +30,6 @@ from .const import (
     SENSOR_MONTHLY_VISITS,
     SENSOR_TOTAL_VISITS,
     SENSOR_ACTIVE_BOOKINGS,
-    SENSOR_GYM_OCCUPANCY,
-    SENSOR_GYM_CAPACITY,
-    SENSOR_GYM_OCCUPANCY_PERCENT,
     SENSOR_LATEST_NOTIFICATION,
     DATA_ACTIVE_CONTRACT,
     DATA_ACCOUNT,
@@ -48,8 +45,6 @@ from .const import (
     DATA_BOOKINGS,
     DATA_CLASSES_VISITS,
     DATA_CLUB,
-    DATA_GYM_OCCUPANCY,
-    DATA_GYM_CAPACITY,
     DATA_NOTIFICATIONS,
 )
 from .coordinator import VivertineDataUpdateCoordinator
@@ -266,19 +261,6 @@ class VivertineSensor(
             recommended = data.get(DATA_RECOMMENDED_CLASS)
             return _format_class_state(recommended)
 
-        if key == SENSOR_GYM_OCCUPANCY:
-            return data.get(DATA_GYM_OCCUPANCY)
-
-        if key == SENSOR_GYM_CAPACITY:
-            return data.get(DATA_GYM_CAPACITY)
-
-        if key == SENSOR_GYM_OCCUPANCY_PERCENT:
-            count = data.get(DATA_GYM_OCCUPANCY)
-            capacity = data.get(DATA_GYM_CAPACITY)
-            if count is not None and capacity and capacity > 0:
-                return round((count / capacity) * 100)
-            return None
-
         if key == SENSOR_LATEST_NOTIFICATION:
             notifications = data.get(DATA_NOTIFICATIONS, [])
             if notifications:
@@ -425,18 +407,6 @@ class VivertineSensor(
                 attrs["type_attendance_count"] = recommended.get(
                     "_type_attendance_count"
                 )
-
-        elif key == SENSOR_GYM_OCCUPANCY:
-            attrs["occupancy_count"] = data.get(DATA_GYM_OCCUPANCY)
-            capacity = data.get(DATA_GYM_CAPACITY)
-            attrs["capacity"] = capacity
-            count = data.get(DATA_GYM_OCCUPANCY)
-            if count is not None and capacity and capacity > 0:
-                attrs["occupancy_percent"] = round((count / capacity) * 100)
-
-        elif key == SENSOR_GYM_OCCUPANCY_PERCENT:
-            attrs["occupancy_count"] = data.get(DATA_GYM_OCCUPANCY)
-            attrs["capacity"] = data.get(DATA_GYM_CAPACITY)
 
         elif key == SENSOR_LATEST_NOTIFICATION:
             notifications = data.get(DATA_NOTIFICATIONS, [])

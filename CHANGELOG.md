@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.10 (2026-03-20)
+
+### Removed
+- **Gym Occupancy** sensors (`gym_occupancy`, `gym_capacity`, `gym_occupancy_percent`) — Vivertine's PerfectGym instance returns `null` for all occupancy fields (`WhoIsInCount.count`, `Limits.limit`, `Limits.currentlyInClubCount`), making these sensors permanently "Unknown". Removed entirely: constants, API methods, coordinator fetch blocks, and sensor logic.
+
 ## 1.0.9 (2026-03-20)
 
 ### Added

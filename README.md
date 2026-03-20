@@ -15,7 +15,6 @@ Custom Home Assistant integration for **Vivertine Gym** (Iași, Romania), built 
 - **Booking status** — active bookings count and standby positions
 - **Favorite classes & instructors** — dedicated sensors for your preferred class types and instructors
 - **Recommended class** — smart recommendation based on your attendance history
-- **Gym occupancy** — real-time people count, capacity limit, and occupancy percentage
 - **Gym notifications** — latest gym notifications/announcements from PerfectGym
 - **Class booking actions** — book and cancel classes directly from Home Assistant
 - **Smart alerts** for favorite classes:
@@ -75,9 +74,6 @@ After setup, configure options via the integration's **Configure** button:
 | `sensor.vivertine_monthly_visits` | Club visits in the last 30 days |
 | `sensor.vivertine_total_visits` | Total club visits |
 | `sensor.vivertine_active_bookings` | Number of active class bookings |
-| `sensor.vivertine_gym_occupancy` | Real-time number of people in the gym |
-| `sensor.vivertine_gym_capacity` | Gym capacity limit (set by the gym) |
-| `sensor.vivertine_gym_occupancy_percent` | Gym occupancy as a percentage |
 | `sensor.vivertine_latest_notification` | Latest gym notification subject/content |
 | `sensor.vivertine_upcoming_schedule` | Full upcoming schedule (in attributes) |
 

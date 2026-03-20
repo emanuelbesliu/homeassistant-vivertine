@@ -22,8 +22,6 @@ ENDPOINT_CLASSES_VISITS = f"/{API_VERSION}/Classes/ClassesVisits"
 ENDPOINT_BOOKINGS = f"/{API_VERSION}/Classes/Bookings"
 ENDPOINT_INSTRUCTORS = f"/{API_VERSION}/Instructors/Instructors"
 ENDPOINT_TIMELINE = f"/{API_VERSION}/Timeline/Timeline"
-ENDPOINT_WHO_IS_IN_COUNT = f"/{API_VERSION}/Clubs/WhoIsInCount"
-ENDPOINT_CLUB_LIMITS = f"/{API_VERSION}/Clubs/Limits"
 ENDPOINT_BOOK_CLASS = f"/{API_VERSION}/Classes/Book"
 ENDPOINT_CANCEL_BOOKING = f"/{API_VERSION}/Classes/CancelBooking"
 ENDPOINT_NOTIFICATIONS = f"/{API_VERSION}/PushNotifications/Notifications"
@@ -72,8 +70,6 @@ DATA_NEXT_FAVORITE_INSTRUCTOR_CLASS = "next_favorite_instructor_class"
 DATA_RECOMMENDED_CLASS = "recommended_class"
 DATA_WEEKLY_VISITS = "weekly_visits"
 DATA_MONTHLY_VISITS = "monthly_visits"
-DATA_GYM_OCCUPANCY = "gym_occupancy"
-DATA_GYM_CAPACITY = "gym_capacity"
 DATA_NOTIFICATIONS = "notifications"
 
 # Contract statuses from API
@@ -96,9 +92,6 @@ SENSOR_ACTIVE_BOOKINGS = "active_bookings"
 SENSOR_NEXT_FAVORITE_CLASS = "next_favorite_class"
 SENSOR_NEXT_FAVORITE_INSTRUCTOR_CLASS = "next_favorite_instructor_class"
 SENSOR_RECOMMENDED_CLASS = "recommended_class"
-SENSOR_GYM_OCCUPANCY = "gym_occupancy"
-SENSOR_GYM_CAPACITY = "gym_capacity"
-SENSOR_GYM_OCCUPANCY_PERCENT = "gym_occupancy_percent"
 SENSOR_LATEST_NOTIFICATION = "latest_notification"
 
 # Service names
@@ -183,24 +176,6 @@ SENSOR_TYPES = {
         "name": "Recommended Class",
         "icon": "mdi:star",
         "unit": None,
-        "device_class": None,
-    },
-    SENSOR_GYM_OCCUPANCY: {
-        "name": "Gym Occupancy",
-        "icon": "mdi:account-group",
-        "unit": "people",
-        "device_class": None,
-    },
-    SENSOR_GYM_CAPACITY: {
-        "name": "Gym Capacity",
-        "icon": "mdi:account-multiple-check",
-        "unit": "people",
-        "device_class": None,
-    },
-    SENSOR_GYM_OCCUPANCY_PERCENT: {
-        "name": "Gym Occupancy Percentage",
-        "icon": "mdi:percent",
-        "unit": "%",
         "device_class": None,
     },
     SENSOR_LATEST_NOTIFICATION: {
