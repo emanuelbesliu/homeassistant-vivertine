@@ -1,0 +1,7 @@
+send_test_notification:
+  name: Send Test Notification
+  description: >-
+    Send a test notification to verify the Vivertine alert system is working.
+    Creates a persistent notification and sends a push notification via the
+    configured notify service (if set in options).
+  fields: {}

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.5 (2026-03-20)
+
+### Added
+- New service `vivertine.send_test_notification` — trigger a test notification from Developer Tools > Services to verify the alert pipeline (persistent notification + mobile push) is working
+
 ## 1.0.4 (2026-03-20)
 
 ### Added

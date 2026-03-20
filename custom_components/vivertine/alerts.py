@@ -111,6 +111,23 @@ class VivertineClassAlerts:
             self._unsub()
             self._unsub = None
 
+    def send_test_notification(self) -> None:
+        """Send a test notification to verify the alert pipeline works."""
+        test_cls = {
+            "id": "test",
+            "class_type_name": "Test Class",
+            "instructor_name": "Test Instructor",
+            "startDate": datetime.now().isoformat(),
+            "endDate": None,
+            "clubZone": "Test Zone",
+        }
+        self._fire_alert(
+            f"{DOMAIN}_test_notification",
+            test_cls,
+            "Notificare de test",
+            "Sistemul de alerte Vivertine funcționează corect!",
+        )
+
     @callback
     def _on_update(self) -> None:
         """Handle coordinator data update — check for class changes."""
