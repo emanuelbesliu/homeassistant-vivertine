@@ -3,7 +3,7 @@
 import logging
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant, ServiceCall, Event
 
 from .api import VivertineAPI, VivertineApiError
 from .alerts import VivertineClassAlerts
@@ -12,9 +12,12 @@ from .const import (
     PLATFORMS,
     CONF_EMAIL,
     CONF_PASSWORD,
+    CONF_NOTIFY_SERVICE,
     SERVICE_SEND_TEST_NOTIFICATION,
     SERVICE_BOOK_CLASS,
     SERVICE_CANCEL_BOOKING,
+    ACTION_BOOK_PREFIX,
+    ACTION_DISMISS_PREFIX,
 )
 from .coordinator import VivertineDataUpdateCoordinator
 
@@ -46,6 +49,78 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Register alerts listener after data is stored
     alerts.register(coordinator)
+
+    # Register listener for actionable notification responses (booking confirmations)
+    async def _handle_notification_action(event: Event) -> None:
+        """Handle mobile_app_notification_action events for booking suggestions."""
+        action = event.data.get("action", "")
+
+        if action.startswith(ACTION_BOOK_PREFIX):
+            class_id_str = action[len(ACTION_BOOK_PREFIX):]
+            try:
+                class_id = int(class_id_str)
+            except (ValueError, TypeError):
+                _LOGGER.warning(
+                    "Invalid class_id in notification action: %s", action
+                )
+                return
+
+            _LOGGER.info("Booking class %s from notification action", class_id)
+            try:
+                await hass.async_add_executor_job(api.book_class, class_id)
+                _LOGGER.info("Successfully booked class %s", class_id)
+            except VivertineApiError as err:
+                _LOGGER.error("Failed to book class %s: %s", class_id, err)
+                # Notify user of failure
+                notify_target = entry.options.get(
+                    CONF_NOTIFY_SERVICE,
+                    entry.data.get(CONF_NOTIFY_SERVICE, ""),
+                )
+                if notify_target:
+                    await hass.services.async_call(
+                        "notify",
+                        notify_target,
+                        {
+                            "title": "Vivertine: Eroare rezervare",
+                            "message": f"Nu am putut rezerva clasa: {err}",
+                        },
+                    )
+                return
+
+            # Trigger coordinator refresh
+            await coordinator.async_request_refresh()
+
+            # Send confirmation notification
+            notify_target = entry.options.get(
+                CONF_NOTIFY_SERVICE,
+                entry.data.get(CONF_NOTIFY_SERVICE, ""),
+            )
+            if notify_target:
+                await hass.services.async_call(
+                    "notify",
+                    notify_target,
+                    {
+                        "title": "Vivertine: Rezervare confirmată!",
+                        "message": "Clasa a fost rezervată cu succes.",
+                        "data": {
+                            "tag": f"vivertine_suggest_{class_id}",
+                        },
+                    },
+                )
+
+        elif action.startswith(ACTION_DISMISS_PREFIX):
+            class_id_str = action[len(ACTION_DISMISS_PREFIX):]
+            _LOGGER.debug(
+                "User dismissed booking suggestion for class %s",
+                class_id_str,
+            )
+
+    unsub_notification_action = hass.bus.async_listen(
+        "mobile_app_notification_action", _handle_notification_action
+    )
+    hass.data[DOMAIN][entry.entry_id][
+        "unsub_notification_action"
+    ] = unsub_notification_action
 
     # Register services (only once, for the first entry)
     if not hass.services.has_service(DOMAIN, SERVICE_SEND_TEST_NOTIFICATION):
@@ -149,6 +224,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         alerts = data.get("alerts")
         if alerts:
             alerts.unregister()
+        unsub_action = data.get("unsub_notification_action")
+        if unsub_action:
+            unsub_action()
         api = data["api"]
         await hass.async_add_executor_job(api.close)
 

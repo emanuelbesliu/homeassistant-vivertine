@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.0.13 (2026-03-20)
+
+### Added
+- **Actionable booking suggestions** — when a recommended, favorite, or favorite-instructor class is detected as unbooked with available spots, the integration sends an actionable push notification to your phone with "Da, rezervă!" and "Nu" buttons. Tapping "Da, rezervă!" books the class automatically and sends a confirmation notification
+- **Smart deduplication** — if 2-3 recommendation types (recommended + favorite + favorite instructor) point to the same class, only ONE notification is sent with a combined reason (e.g., "Clasă recomandată + favorită")
+- **Buddy enrichment in suggestions** — booking suggestion notifications mention which buddies are already going to the class (e.g., "Ana M. și Mihai P. participă!")
+- **`buddies_going` attribute** on `next_favorite_class`, `next_favorite_instructor_class`, and `recommended_class` sensors — shows which buddies are signed up for that class (even if you haven't booked it)
+- New HA event: `vivertine_booking_suggestion` — fired alongside the notification for automation use
+
+### Technical
+- New `_check_booking_suggestions()` method in `alerts.py` — runs on every coordinator update, checks three recommendation sources, deduplicates by class ID, respects booking/spots/already-suggested filters
+- New `_send_actionable_notification()` method in `alerts.py` — sends mobile push with `data.actions` and `data.tag` for iOS/Android Companion App
+- New `mobile_app_notification_action` event listener in `__init__.py` — handles "Da, rezervă!" button taps by calling `api.book_class()`, refreshing coordinator, and sending confirmation
+- Error notification on booking failure ("Nu am putut rezerva clasa: ...")
+- Proper cleanup: unsub for notification action listener in `async_unload_entry()`
+- New coordinator key `buddies_by_class` in `_build_class_buddies()` — maps ANY classId to buddy name list (not just booked classes)
+
 ## 1.0.12 (2026-03-20)
 
 ### Fixed

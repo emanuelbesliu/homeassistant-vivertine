@@ -23,6 +23,7 @@ Custom Home Assistant integration for **Vivertine Gym** (Iași, Romania), built 
   - Class time changed
   - Instructor changed
   - Available spots below threshold (default: 5)
+- **Actionable booking suggestions** — push notifications with "Book" / "Dismiss" buttons when recommended or favorite classes have spots available, with buddy info included
 
 ## Installation
 
@@ -112,6 +113,21 @@ The `class_buddies` sensor shows who's signed up for your booked classes:
 - **Buddy detection**: cross-references attendees with your visit history — anyone who appeared in a past class you also attended is flagged as `is_buddy: true`
 - **Privacy**: names shown as first name + last initial (e.g. "Ana P."), no photos or social media
 - **Enrichment**: the `next_class` and `active_bookings` sensors also gain `who_is_going` in their attributes
+- **Buddies on recommendations**: the `next_favorite_class`, `next_favorite_instructor_class`, and `recommended_class` sensors include a `buddies_going` attribute showing which buddies are signed up
+
+### Actionable booking suggestions
+
+When the integration detects an unbooked class that matches your recommendations or favorites, it sends an actionable push notification to your phone:
+
+- **Trigger**: every coordinator update (default 5 min), checks recommended, favorite class, and favorite instructor class
+- **Notification**: includes class name, instructor, time, reason (e.g., "Clasă recomandată + favorită"), and which buddies are going
+- **Buttons**:
+  - **"Da, rezervă!"** — books the class automatically and sends a confirmation notification
+  - **"Nu"** — dismisses the suggestion
+- **Deduplication**: if multiple recommendation types point to the same class, only one notification is sent with combined reasons
+- **Filters**: skips already-booked classes, classes with no spots, and classes already suggested this session
+- **Requires**: a notification service configured in the integration options (e.g., `mobile_app_iphone`)
+- **Works on**: iOS and Android via the HA Companion App
 
 ## Services
 
@@ -131,6 +147,7 @@ When favorite classes or favorite instructors are configured, the integration fi
 | `vivertine_class_moved` | A favorite class time was changed |
 | `vivertine_class_instructor_changed` | Instructor changed for a favorite class |
 | `vivertine_class_low_spots` | Available spots dropped below threshold |
+| `vivertine_booking_suggestion` | Booking suggestion for a recommended/favorite class |
 
 Each event includes: `class_name`, `instructor`, `start_date`, `message`, `title`.
 

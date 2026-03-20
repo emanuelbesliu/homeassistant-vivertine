@@ -11,7 +11,7 @@ the current class data against the previous snapshot to detect changes.
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.core import HomeAssistant, callback
@@ -29,7 +29,15 @@ from .const import (
     EVENT_CLASS_MOVED,
     EVENT_CLASS_INSTRUCTOR_CHANGED,
     EVENT_CLASS_LOW_SPOTS,
+    EVENT_BOOKING_SUGGESTION,
+    ACTION_BOOK_PREFIX,
+    ACTION_DISMISS_PREFIX,
     DATA_CLASSES,
+    DATA_BOOKINGS,
+    DATA_NEXT_FAVORITE_CLASS,
+    DATA_NEXT_FAVORITE_INSTRUCTOR_CLASS,
+    DATA_RECOMMENDED_CLASS,
+    DATA_CLASS_BUDDIES,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -156,6 +164,9 @@ class VivertineClassAlerts:
             self._detect_changes(current_classes)
 
         self._previous_classes = current_classes
+
+        # Check for booking suggestions (actionable notifications)
+        self._check_booking_suggestions(coordinator)
 
     def _build_class_snapshot(
         self,
@@ -411,6 +422,237 @@ class VivertineClassAlerts:
             _LOGGER.warning(
                 "Failed to send notification via notify.%s", target
             )
+
+    def _check_booking_suggestions(
+        self,
+        coordinator: DataUpdateCoordinator,
+    ) -> None:
+        """Check if recommended/favorite classes should be suggested for booking.
+
+        Deduplicates by class ID: if 2-3 recommendation types point to the
+        same class, only ONE notification is sent with combined reasons.
+        """
+        data = coordinator.data
+        if not data:
+            return
+
+        notify_target = self._notify_service
+        if not notify_target:
+            return
+
+        # Gather candidate classes with their reason labels
+        candidates: dict[int, dict[str, Any]] = {}
+
+        rec = data.get(DATA_RECOMMENDED_CLASS)
+        if rec and rec.get("id") is not None:
+            cid = rec["id"]
+            candidates.setdefault(cid, {"cls": rec, "reasons": []})
+            candidates[cid]["reasons"].append("recomandată")
+
+        fav = data.get(DATA_NEXT_FAVORITE_CLASS)
+        if fav and fav.get("id") is not None:
+            cid = fav["id"]
+            candidates.setdefault(cid, {"cls": fav, "reasons": []})
+            candidates[cid]["reasons"].append("favorită")
+
+        fav_inst = data.get(DATA_NEXT_FAVORITE_INSTRUCTOR_CLASS)
+        if fav_inst and fav_inst.get("id") is not None:
+            cid = fav_inst["id"]
+            candidates.setdefault(cid, {"cls": fav_inst, "reasons": []})
+            candidates[cid]["reasons"].append("instructor favorit")
+
+        if not candidates:
+            return
+
+        # Build set of actively booked class IDs
+        bookings = data.get(DATA_BOOKINGS, [])
+        booked_cids: set[int] = set()
+        for b in bookings:
+            if not b.get("isCanceled", False):
+                bcid = b.get("classId")
+                if bcid is not None:
+                    booked_cids.add(bcid)
+
+        # Buddies data for enrichment
+        buddies_by_class = (
+            data.get(DATA_CLASS_BUDDIES, {}).get("buddies_by_class", {})
+        )
+
+        for cls_id, info in candidates.items():
+            cls = info["cls"]
+            reasons = info["reasons"]
+
+            # Skip already booked
+            if cls_id in booked_cids:
+                continue
+
+            # Skip no available spots
+            spots = cls.get("available_spots")
+            if spots is not None and spots <= 0:
+                continue
+
+            # Skip already suggested
+            alert_key = f"suggest_{cls_id}"
+            if alert_key in self._sent_alerts:
+                continue
+            self._sent_alerts.add(alert_key)
+
+            # Build message
+            class_display = self._format_class_display(cls)
+            reason_str = "Clasă " + " + ".join(reasons)
+
+            lines = [class_display, reason_str]
+
+            # Include buddies if any
+            buddies = buddies_by_class.get(cls_id, [])
+            if buddies:
+                if len(buddies) == 1:
+                    lines.append(f"{buddies[0]} participă!")
+                elif len(buddies) == 2:
+                    lines.append(
+                        f"{buddies[0]} și {buddies[1]} participă!"
+                    )
+                else:
+                    names = ", ".join(buddies[:-1])
+                    lines.append(
+                        f"{names} și {buddies[-1]} participă!"
+                    )
+
+            if spots is not None:
+                lines.append(f"{spots} locuri disponibile")
+
+            message = "\n".join(lines)
+            title = "Sugestie de rezervare"
+
+            # Fire HA event
+            event_data = {
+                "entry_id": self._entry.entry_id,
+                "class_id": cls_id,
+                "class_name": cls.get("class_type_name"),
+                "instructor": cls.get("instructor_name"),
+                "start_date": cls.get("startDate"),
+                "reasons": reasons,
+                "buddies_going": buddies,
+                "available_spots": spots,
+                "title": title,
+                "message": message,
+            }
+            self._hass.bus.async_fire(EVENT_BOOKING_SUGGESTION, event_data)
+            _LOGGER.info(
+                "Vivertine booking suggestion [%s]: %s",
+                cls_id,
+                reason_str,
+            )
+
+            # Persistent notification
+            notification_id = f"vivertine_suggest_{cls_id}"
+            self._hass.async_create_task(
+                self._hass.services.async_call(
+                    "persistent_notification",
+                    "create",
+                    {
+                        "message": message,
+                        "title": f"Vivertine: {title}",
+                        "notification_id": notification_id,
+                    },
+                )
+            )
+
+            # Actionable mobile notification
+            actions = [
+                {
+                    "action": f"{ACTION_BOOK_PREFIX}{cls_id}",
+                    "title": "Da, rezervă!",
+                },
+                {
+                    "action": f"{ACTION_DISMISS_PREFIX}{cls_id}",
+                    "title": "Nu",
+                },
+            ]
+            tag = f"vivertine_suggest_{cls_id}"
+            self._hass.async_create_task(
+                self._send_actionable_notification(
+                    notify_target, title, message, actions, tag
+                )
+            )
+
+    async def _send_actionable_notification(
+        self,
+        target: str,
+        title: str,
+        message: str,
+        actions: list[dict[str, str]],
+        tag: str,
+    ) -> None:
+        """Send an actionable mobile notification with buttons."""
+        try:
+            await self._hass.services.async_call(
+                "notify",
+                target,
+                {
+                    "title": f"Vivertine: {title}",
+                    "message": message,
+                    "data": {
+                        "actions": actions,
+                        "tag": tag,
+                    },
+                },
+            )
+        except Exception:  # noqa: BLE001
+            _LOGGER.warning(
+                "Failed to send actionable notification via notify.%s",
+                target,
+            )
+
+    @staticmethod
+    def _format_class_display(cls: dict[str, Any]) -> str:
+        """Format a class into a display string for notifications.
+
+        Format: "ClassName — Instructor @ Mâine 18:00"
+        """
+        name = cls.get("class_type_name", "Unknown")
+        instructor = cls.get("instructor_name", "")
+
+        if instructor and instructor != "N/A":
+            base = f"{name} — {instructor}"
+        else:
+            base = name
+
+        start_str = cls.get("startDate")
+        if not start_str:
+            return base
+
+        try:
+            start_dt = datetime.fromisoformat(
+                start_str.replace("Z", "+00:00")
+            ).replace(tzinfo=None)
+        except (ValueError, TypeError):
+            return base
+
+        now = datetime.now()
+        today = now.date()
+        class_date = start_dt.date()
+        time_str = start_dt.strftime("%H:%M")
+
+        days_ro = {
+            0: "Luni",
+            1: "Marți",
+            2: "Miercuri",
+            3: "Joi",
+            4: "Vineri",
+            5: "Sâmbătă",
+            6: "Duminică",
+        }
+
+        if class_date == today:
+            return f"{base} @ {time_str}"
+        elif class_date == today + timedelta(days=1):
+            return f"{base} @ Mâine {time_str}"
+        else:
+            day_name = days_ro.get(
+                class_date.weekday(), class_date.strftime("%d/%m")
+            )
+            return f"{base} @ {day_name} {time_str}"
 
     @staticmethod
     def _format_datetime(dt_str: str | None) -> str:

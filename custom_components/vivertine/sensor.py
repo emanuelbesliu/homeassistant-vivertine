@@ -409,6 +409,12 @@ class VivertineSensor(
                 attrs["available_spots"] = next_fav.get("available_spots")
                 attrs["attendees"] = next_fav.get("attendeesCount")
                 attrs["limit"] = next_fav.get("attendeesLimit")
+                # Buddies going to this class
+                buddies_data = data.get(DATA_CLASS_BUDDIES, {})
+                bbc = buddies_data.get("buddies_by_class", {})
+                fav_cid = next_fav.get("id")
+                if fav_cid and fav_cid in bbc:
+                    attrs["buddies_going"] = bbc[fav_cid]
 
         elif key == SENSOR_NEXT_FAVORITE_INSTRUCTOR_CLASS:
             next_fav_inst = data.get(DATA_NEXT_FAVORITE_INSTRUCTOR_CLASS)
@@ -423,6 +429,12 @@ class VivertineSensor(
                 )
                 attrs["attendees"] = next_fav_inst.get("attendeesCount")
                 attrs["limit"] = next_fav_inst.get("attendeesLimit")
+                # Buddies going to this class
+                buddies_data = data.get(DATA_CLASS_BUDDIES, {})
+                bbc = buddies_data.get("buddies_by_class", {})
+                fi_cid = next_fav_inst.get("id")
+                if fi_cid and fi_cid in bbc:
+                    attrs["buddies_going"] = bbc[fi_cid]
 
         elif key == SENSOR_RECOMMENDED_CLASS:
             recommended = data.get(DATA_RECOMMENDED_CLASS)
@@ -443,6 +455,12 @@ class VivertineSensor(
                 attrs["type_attendance_count"] = recommended.get(
                     "_type_attendance_count"
                 )
+                # Buddies going to this class
+                buddies_data = data.get(DATA_CLASS_BUDDIES, {})
+                bbc = buddies_data.get("buddies_by_class", {})
+                rec_cid = recommended.get("id")
+                if rec_cid and rec_cid in bbc:
+                    attrs["buddies_going"] = bbc[rec_cid]
 
         elif key == SENSOR_LATEST_NOTIFICATION:
             notifications = data.get(DATA_NOTIFICATIONS, [])

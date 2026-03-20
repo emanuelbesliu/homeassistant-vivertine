@@ -47,6 +47,11 @@ EVENT_CLASS_CANCELLED = f"{DOMAIN}_class_cancelled"
 EVENT_CLASS_MOVED = f"{DOMAIN}_class_moved"
 EVENT_CLASS_INSTRUCTOR_CHANGED = f"{DOMAIN}_class_instructor_changed"
 EVENT_CLASS_LOW_SPOTS = f"{DOMAIN}_class_low_spots"
+EVENT_BOOKING_SUGGESTION = f"{DOMAIN}_booking_suggestion"
+
+# Actionable notification action prefixes
+ACTION_BOOK_PREFIX = "VIVERTINE_BOOK_"
+ACTION_DISMISS_PREFIX = "VIVERTINE_DISMISS_"
 
 # Data keys in coordinator.data
 DATA_ACCOUNT = "account"

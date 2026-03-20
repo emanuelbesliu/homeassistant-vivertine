@@ -583,6 +583,11 @@ class VivertineDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             - "next_booked_attendee_count": count for that class
             - "by_class": dict keyed by classId -> list of attendee dicts
               Each attendee: {"name": str, "is_standby": bool, "is_buddy": bool}
+              Only contains entries for actively booked classes.
+            - "buddies_by_class": dict keyed by classId -> list of buddy
+              name strings. Covers ALL classes in WhoIsIn, not just
+              booked ones. Used by sensors that may point to unbooked
+              classes (recommended, favorite class, favorite instructor).
 
         Buddy detection: A person is a 'buddy' if they appeared in at
         least one past class that the user also booked. We use the
@@ -598,6 +603,7 @@ class VivertineDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "next_booked_class_id": None,
                 "next_booked_attendee_count": 0,
                 "by_class": {},
+                "buddies_by_class": {},
             }
 
         # 1. Separate bookings into all class IDs (for buddy detection)
@@ -617,6 +623,7 @@ class VivertineDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "next_booked_class_id": None,
                 "next_booked_attendee_count": 0,
                 "by_class": {},
+                "buddies_by_class": {},
             }
 
         # 2. Get user's own name to exclude from attendee lists
@@ -684,7 +691,58 @@ class VivertineDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
             by_class[booked_cid] = attendees
 
-        # 6. Determine the "next" booked class (earliest start time)
+        # 6. Build buddies-only lists for ALL classes in WhoIsIn.
+        #    This allows sensors for non-booked classes (recommended,
+        #    favorite class/instructor) to show which buddies are going.
+        #    Only stores names of known buddies — lightweight.
+        #    A person is a buddy if they appear in ANY user-booked class
+        #    (i.e., they are in person_class_ids with at least 1 entry).
+        buddy_name_set: set[str] = set()
+        for key, class_set in person_class_ids.items():
+            # Person appears in at least 1 user-booked class → is a buddy
+            # Build their formatted name from any WhoIsIn entry
+            for cid_check in class_set:
+                for entry in who_by_class.get(cid_check, []):
+                    e_f = (
+                        entry.get("firstName") or ""
+                    ).strip().lower()
+                    e_l = (
+                        entry.get("lastName") or ""
+                    ).strip().lower()
+                    if (e_f, e_l) == key:
+                        buddy_name_set.add(
+                            VivertineDataUpdateCoordinator
+                            ._format_attendee_name(entry)
+                        )
+                        break
+                break  # only need one entry for the name
+
+        buddies_by_class: dict[int, list[str]] = {}
+        for cid, entries in who_by_class.items():
+            class_buddies: list[str] = []
+            for entry in entries:
+                if entry.get("isCanceled") or entry.get("isDeleted"):
+                    continue
+                e_first = (
+                    entry.get("firstName") or ""
+                ).strip().lower()
+                e_last = (
+                    entry.get("lastName") or ""
+                ).strip().lower()
+                if e_first == user_first and e_last == user_last:
+                    continue
+                name = (
+                    VivertineDataUpdateCoordinator._format_attendee_name(
+                        entry
+                    )
+                )
+                if name in buddy_name_set:
+                    class_buddies.append(name)
+            if class_buddies:
+                class_buddies.sort()
+                buddies_by_class[cid] = class_buddies
+
+        # 7. Determine the "next" booked class (earliest start time)
         #    The sensor layer will pick the actual "next" one based on
         #    class start times from DATA_UPCOMING_CLASSES
         next_booked_cid: int | None = None
@@ -699,6 +757,7 @@ class VivertineDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "next_booked_class_id": next_booked_cid,
             "next_booked_attendee_count": next_booked_count,
             "by_class": by_class,
+            "buddies_by_class": buddies_by_class,
         }
 
     @staticmethod
