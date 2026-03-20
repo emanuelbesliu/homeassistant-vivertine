@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.7 (2026-03-20)
+
+### Fixed
+- Fix alerts firing for past classes — `_build_class_snapshot()` now filters out classes whose `startDate` is in the past, preventing stale notifications (e.g., low-spots alerts for classes already held)
+- Fix false "class cancelled" alerts when a class naturally transitions from future to past between coordinator update cycles — now checks if the class start time has passed before treating a snapshot disappearance as a cancellation
+
 ## 1.0.6 (2026-03-20)
 
 ### Added

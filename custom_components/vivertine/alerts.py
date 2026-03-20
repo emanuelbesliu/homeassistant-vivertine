@@ -167,9 +167,24 @@ class VivertineClassAlerts:
 
         A class is included if its class_type_name matches a favorite class
         OR its instructor_name matches a favorite instructor.
+        Only future classes are included — past classes are skipped to
+        avoid stale alerts (e.g., low-spots on classes already held).
         """
+        now = datetime.now()
         snapshot = {}
         for cls in classes:
+            # Skip classes that have already started
+            start_str = cls.get("startDate")
+            if start_str:
+                try:
+                    start_dt = datetime.fromisoformat(
+                        start_str.replace("Z", "+00:00")
+                    ).replace(tzinfo=None)
+                    if start_dt <= now:
+                        continue
+                except (ValueError, TypeError):
+                    pass  # keep class if we can't parse the date
+
             class_name = (cls.get("class_type_name") or "").lower()
             instructor = (cls.get("instructor_name") or "").lower()
             is_fav_class = class_name in favorites if favorites else False
@@ -202,12 +217,27 @@ class VivertineClassAlerts:
     ) -> None:
         """Compare current vs previous snapshot and fire alerts."""
         threshold = self._low_spots_threshold
+        now = datetime.now()
 
         for cls_id, prev_cls in self._previous_classes.items():
             curr_cls = current.get(cls_id)
 
             if curr_cls is None:
-                # Class disappeared entirely — treat as cancelled
+                # Class disappeared from snapshot — could be cancelled OR
+                # simply moved to the past (already held). Only alert if
+                # the class was still in the future at last check.
+                prev_start_str = prev_cls.get("startDate")
+                if prev_start_str:
+                    try:
+                        prev_start = datetime.fromisoformat(
+                            prev_start_str.replace("Z", "+00:00")
+                        ).replace(tzinfo=None)
+                        if prev_start <= now:
+                            # Class already started — not a cancellation
+                            continue
+                    except (ValueError, TypeError):
+                        pass
+
                 alert_key = f"cancelled_{cls_id}"
                 if alert_key not in self._sent_alerts:
                     self._sent_alerts.add(alert_key)
