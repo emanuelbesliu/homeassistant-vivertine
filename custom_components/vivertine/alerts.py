@@ -331,10 +331,16 @@ class VivertineClassAlerts:
         notification_id = (
             f"vivertine_{event_type}_{cls_data.get('id', 'unknown')}"
         )
-        self._hass.components.persistent_notification.async_create(
-            message=message,
-            title=f"Vivertine: {title}",
-            notification_id=notification_id,
+        self._hass.async_create_task(
+            self._hass.services.async_call(
+                "persistent_notification",
+                "create",
+                {
+                    "message": message,
+                    "title": f"Vivertine: {title}",
+                    "notification_id": notification_id,
+                },
+            )
         )
 
         # Mobile notification via configured service

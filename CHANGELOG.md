@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.3 (2026-03-20)
+
+### Fixed
+- Fix `AttributeError: 'HomeAssistant' object has no attribute 'components'` in alerts.py — replaced deprecated `hass.components.persistent_notification.async_create()` with `hass.services.async_call("persistent_notification", "create", ...)` for modern HA compatibility
+
 ## 1.0.2 (2026-03-19)
 
 ### Added
