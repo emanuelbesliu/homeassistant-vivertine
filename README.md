@@ -15,6 +15,7 @@ Custom Home Assistant integration for **Vivertine Gym** (Iași, Romania), built 
 - **Booking status** — active bookings count and standby positions
 - **Favorite classes & instructors** — dedicated sensors for your preferred class types and instructors
 - **Recommended class** — smart recommendation based on your attendance history
+- **Class Buddies** — see who's going to your booked classes, with buddy highlighting (people you've worked out with before)
 - **Gym notifications** — latest gym notifications/announcements from PerfectGym
 - **Class booking actions** — book and cancel classes directly from Home Assistant
 - **Smart alerts** for favorite classes:
@@ -75,6 +76,7 @@ After setup, configure options via the integration's **Configure** button:
 | `sensor.vivertine_total_visits` | Total club visits |
 | `sensor.vivertine_active_bookings` | Number of active class bookings |
 | `sensor.vivertine_latest_notification` | Latest gym notification subject/content |
+| `sensor.vivertine_class_buddies` | Attendees going to your next booked class (with buddy flags) |
 | `sensor.vivertine_upcoming_schedule` | Full upcoming schedule (in attributes) |
 
 ### Class sensor display format
@@ -95,6 +97,21 @@ The `recommended_class` sensor uses a scoring algorithm based on your attendance
 - Scores each upcoming class: `attendance_count × 2`
 - Returns the highest-scoring upcoming class (earlier classes win ties)
 - Extra attributes include `recommendation_score` and `type_attendance_count`
+
+### Class Buddies sensor
+
+The `class_buddies` sensor shows who's signed up for your booked classes:
+
+- **State**: attendee count for your next booked class (excludes yourself)
+- **Attributes**:
+  - `next_class_name`, `next_class_instructor`, `next_class_start` — details of the next booked class
+  - `who_is_going` — list of attendees for the next booked class, each with `name`, `is_standby`, `is_buddy`
+  - `buddy_count` — number of buddies (people you've attended with before) in the next class
+  - `standby_count` — number of people on standby
+  - `booked_classes` — full attendee data for all your booked classes
+- **Buddy detection**: cross-references attendees with your visit history — anyone who appeared in a past class you also attended is flagged as `is_buddy: true`
+- **Privacy**: names shown as first name + last initial (e.g. "Ana P."), no photos or social media
+- **Enrichment**: the `next_class` and `active_bookings` sensors also gain `who_is_going` in their attributes
 
 ## Services
 

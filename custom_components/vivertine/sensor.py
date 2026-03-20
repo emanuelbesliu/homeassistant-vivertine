@@ -31,6 +31,7 @@ from .const import (
     SENSOR_TOTAL_VISITS,
     SENSOR_ACTIVE_BOOKINGS,
     SENSOR_LATEST_NOTIFICATION,
+    SENSOR_CLASS_BUDDIES,
     DATA_ACTIVE_CONTRACT,
     DATA_ACCOUNT,
     DATA_UPCOMING_CLASSES,
@@ -46,6 +47,7 @@ from .const import (
     DATA_CLASSES_VISITS,
     DATA_CLUB,
     DATA_NOTIFICATIONS,
+    DATA_CLASS_BUDDIES,
 )
 from .coordinator import VivertineDataUpdateCoordinator
 
@@ -272,6 +274,29 @@ class VivertineSensor(
                 return (content or "")[:255] if content else "No notifications"
             return "No notifications"
 
+        if key == SENSOR_CLASS_BUDDIES:
+            buddies = data.get(DATA_CLASS_BUDDIES, {})
+            # Find the next booked class from upcoming classes
+            upcoming = data.get(DATA_UPCOMING_CLASSES, [])
+            bookings_data = data.get(DATA_BOOKINGS, [])
+            active_booking_cids = {
+                b.get("classId")
+                for b in bookings_data
+                if not b.get("isCanceled", False)
+            }
+            by_class = buddies.get("by_class", {})
+            # Find the earliest upcoming class that is booked
+            for cls in upcoming:
+                cid = cls.get("id")
+                if cid in active_booking_cids and cid in by_class:
+                    return len(by_class[cid])
+            # No booked upcoming class found with attendee data
+            if by_class:
+                # Fall back to first available booked class
+                first_cid = next(iter(by_class))
+                return len(by_class[first_cid])
+            return 0
+
         return None
 
     @property
@@ -315,6 +340,12 @@ class VivertineSensor(
                 attrs["available_spots"] = next_cls.get("available_spots")
                 attrs["attendees"] = next_cls.get("attendeesCount")
                 attrs["limit"] = next_cls.get("attendeesLimit")
+                # Enrich with who's going (if this class is booked)
+                buddies = data.get(DATA_CLASS_BUDDIES, {})
+                by_class = buddies.get("by_class", {})
+                next_cid = next_cls.get("id")
+                if next_cid and next_cid in by_class:
+                    attrs["who_is_going"] = by_class[next_cid]
 
         elif key == SENSOR_TODAYS_CLASSES:
             todays = data.get(DATA_TODAYS_CLASSES, [])
@@ -337,15 +368,20 @@ class VivertineSensor(
             active = [
                 b for b in bookings if not b.get("isCanceled", False)
             ]
+            buddies = data.get(DATA_CLASS_BUDDIES, {})
+            by_class = buddies.get("by_class", {})
             booking_list = []
             for b in active[:10]:
-                booking_list.append(
-                    {
-                        "class_id": b.get("classId"),
-                        "is_standby": b.get("isStandby"),
-                        "standby_position": b.get("standbyPosition"),
-                    }
-                )
+                b_entry: dict[str, Any] = {
+                    "class_id": b.get("classId"),
+                    "is_standby": b.get("isStandby"),
+                    "standby_position": b.get("standbyPosition"),
+                }
+                cid = b.get("classId")
+                if cid and cid in by_class:
+                    b_entry["who_is_going"] = by_class[cid]
+                    b_entry["attendee_count"] = len(by_class[cid])
+                booking_list.append(b_entry)
             attrs["bookings"] = booking_list
 
         elif key == SENSOR_TOTAL_VISITS:
@@ -421,6 +457,57 @@ class VivertineSensor(
                 )
             attrs["recent_notifications"] = recent
             attrs["notification_count"] = len(notifications)
+
+        elif key == SENSOR_CLASS_BUDDIES:
+            buddies = data.get(DATA_CLASS_BUDDIES, {})
+            by_class = buddies.get("by_class", {})
+            upcoming = data.get(DATA_UPCOMING_CLASSES, [])
+            bookings_data = data.get(DATA_BOOKINGS, [])
+            active_booking_cids = {
+                b.get("classId")
+                for b in bookings_data
+                if not b.get("isCanceled", False)
+            }
+            # Find the next booked upcoming class
+            next_booked_cls = None
+            for cls in upcoming:
+                cid = cls.get("id")
+                if cid in active_booking_cids:
+                    next_booked_cls = cls
+                    break
+            if next_booked_cls:
+                next_cid = next_booked_cls.get("id")
+                attrs["next_class_name"] = next_booked_cls.get(
+                    "class_type_name"
+                )
+                attrs["next_class_instructor"] = next_booked_cls.get(
+                    "instructor_name"
+                )
+                attrs["next_class_start"] = next_booked_cls.get("startDate")
+                attendees = by_class.get(next_cid, [])
+                attrs["who_is_going"] = attendees
+                attrs["buddy_count"] = len(
+                    [a for a in attendees if a.get("is_buddy")]
+                )
+                attrs["standby_count"] = len(
+                    [a for a in attendees if a.get("is_standby")]
+                )
+            # Include all booked classes' attendee data
+            all_classes_data = []
+            for booked_cid in by_class:
+                attendees = by_class[booked_cid]
+                all_classes_data.append(
+                    {
+                        "class_id": booked_cid,
+                        "attendee_count": len(attendees),
+                        "buddy_count": len(
+                            [a for a in attendees if a.get("is_buddy")]
+                        ),
+                        "attendees": attendees[:20],  # cap per class
+                    }
+                )
+            attrs["booked_classes"] = all_classes_data
+            attrs["total_booked_classes"] = len(by_class)
 
         return attrs
 

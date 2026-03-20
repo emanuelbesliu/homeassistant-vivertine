@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.11 (2026-03-20)
+
+### Added
+- **Class Buddies** sensor (`class_buddies`) — shows who's going to your next booked class. State = attendee count, attributes include full attendee lists per booked class with buddy highlighting
+- **Buddy detection** — cross-references class attendees with your visit history to flag people you've previously worked out with as "buddies" (`is_buddy: true`)
+- **Privacy-first**: attendee names displayed as first name + last initial (e.g. "Emanuel B."), no photos or social media exposed
+- **Enriched existing sensors**: `next_class` and `active_bookings` now include `who_is_going` attendee lists in their attributes
+- Attendees sorted with buddies first, then alphabetical; standby status included
+
+### Technical
+- New API method: `get_who_is_in()` fetches full attendee list from `GET /v1/Classes/WhoIsIn` endpoint (~10K entries)
+- WhoIsIn fetch is fault-tolerant (wrapped in try/except, like notifications)
+- New coordinator method: `_build_class_buddies()` processes attendee data, filters by booked classes, detects buddies via visit history cross-reference
+
 ## 1.0.10 (2026-03-20)
 
 ### Removed

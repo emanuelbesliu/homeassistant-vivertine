@@ -25,6 +25,7 @@ from .const import (
     ENDPOINT_BOOK_CLASS,
     ENDPOINT_CANCEL_BOOKING,
     ENDPOINT_NOTIFICATIONS,
+    ENDPOINT_WHO_IS_IN,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -376,6 +377,23 @@ class VivertineAPI:
     def get_timeline(self) -> list[dict[str, Any]]:
         """Fetch user's timeline (club visits / check-ins)."""
         data = self._get(ENDPOINT_TIMELINE)
+        return data if isinstance(data, list) else []
+
+    # ------------------------------------------------------------------
+    # Class attendees (Who's In)
+    # ------------------------------------------------------------------
+
+    def get_who_is_in(self) -> list[dict[str, Any]]:
+        """Fetch class attendee lists (who's signed up for each class).
+
+        Returns a list of attendee entries, each with:
+            firstName, lastName, nickName, photoUrl, instagramUrl,
+            isStandby, isCanceled, classId, companyId, timestamp
+
+        Note: This endpoint returns ALL attendees across ALL classes.
+        The caller should filter by classId for specific classes.
+        """
+        data = self._get(ENDPOINT_WHO_IS_IN)
         return data if isinstance(data, list) else []
 
     # ------------------------------------------------------------------

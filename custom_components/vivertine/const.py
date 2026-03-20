@@ -25,6 +25,7 @@ ENDPOINT_TIMELINE = f"/{API_VERSION}/Timeline/Timeline"
 ENDPOINT_BOOK_CLASS = f"/{API_VERSION}/Classes/Book"
 ENDPOINT_CANCEL_BOOKING = f"/{API_VERSION}/Classes/CancelBooking"
 ENDPOINT_NOTIFICATIONS = f"/{API_VERSION}/PushNotifications/Notifications"
+ENDPOINT_WHO_IS_IN = f"/{API_VERSION}/Classes/WhoIsIn"
 
 # Configuration keys
 CONF_EMAIL = "email"
@@ -71,6 +72,7 @@ DATA_RECOMMENDED_CLASS = "recommended_class"
 DATA_WEEKLY_VISITS = "weekly_visits"
 DATA_MONTHLY_VISITS = "monthly_visits"
 DATA_NOTIFICATIONS = "notifications"
+DATA_CLASS_BUDDIES = "class_buddies"
 
 # Contract statuses from API
 CONTRACT_STATUS_CURRENT = "Current"
@@ -93,6 +95,7 @@ SENSOR_NEXT_FAVORITE_CLASS = "next_favorite_class"
 SENSOR_NEXT_FAVORITE_INSTRUCTOR_CLASS = "next_favorite_instructor_class"
 SENSOR_RECOMMENDED_CLASS = "recommended_class"
 SENSOR_LATEST_NOTIFICATION = "latest_notification"
+SENSOR_CLASS_BUDDIES = "class_buddies"
 
 # Service names
 SERVICE_SEND_TEST_NOTIFICATION = "send_test_notification"
@@ -182,6 +185,12 @@ SENSOR_TYPES = {
         "name": "Latest Gym Notification",
         "icon": "mdi:bell",
         "unit": None,
+        "device_class": None,
+    },
+    SENSOR_CLASS_BUDDIES: {
+        "name": "Class Buddies",
+        "icon": "mdi:account-group",
+        "unit": "people",
         "device_class": None,
     },
 }
