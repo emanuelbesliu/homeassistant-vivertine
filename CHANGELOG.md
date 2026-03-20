@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.17 (2026-03-20)
+
+### Added
+- **Snooze button on booking suggestions** — actionable notifications now have a third button "Ma mai gandesc" ("Let me think about it") between "Da, rezerva!" and "Nu". Tapping it temporarily hides the suggestion for 1 hour (default cooldown), after which it re-triggers on the next coordinator update cycle. Unlike "Nu" (permanent dismiss), snooze is in-memory only — after HA restart, snoozed suggestions re-appear immediately (same as ignored notifications)
+
+### Technical
+- New constants in `const.py`: `ACTION_SNOOZE_PREFIX = "VIVERTINE_SNOOZE_"`, `DEFAULT_SNOOZE_COOLDOWN_SECONDS = 3600`
+- New `_snoozed_suggestions` dict in `alerts.py` — maps `class_id` to `monotonic()` expiry timestamp. Checked on every coordinator update; expired entries are cleaned up automatically
+- New `async_snooze_suggestion()` method in `alerts.py` — sets cooldown and removes class from `_sent_alerts` so it can re-trigger
+- Snooze cooldown check integrated into `_check_booking_suggestions()` dedup logic (checked after `_sent_alerts` and `_dismissed_suggestions`)
+- New `ACTION_SNOOZE_PREFIX` handler in `__init__.py` `_handle_notification_action` event listener
+
 ## 1.0.16 (2026-03-20)
 
 ### Added

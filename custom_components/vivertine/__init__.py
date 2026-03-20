@@ -21,6 +21,7 @@ from .const import (
     SERVICE_CANCEL_BOOKING,
     ACTION_BOOK_PREFIX,
     ACTION_DISMISS_PREFIX,
+    ACTION_SNOOZE_PREFIX,
 )
 from .coordinator import VivertineDataUpdateCoordinator
 
@@ -197,6 +198,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 )
                 return
             await alerts.async_dismiss_suggestion(dismissed_id)
+
+        elif action.startswith(ACTION_SNOOZE_PREFIX):
+            class_id_str = action[len(ACTION_SNOOZE_PREFIX):]
+            _LOGGER.info(
+                "User snoozed booking suggestion for class %s",
+                class_id_str,
+            )
+            try:
+                snoozed_id = int(class_id_str)
+            except (ValueError, TypeError):
+                _LOGGER.warning(
+                    "Invalid class_id in snooze action: %s", action
+                )
+                return
+            alerts.async_snooze_suggestion(snoozed_id)
 
     unsub_notification_action = hass.bus.async_listen(
         "mobile_app_notification_action", _handle_notification_action

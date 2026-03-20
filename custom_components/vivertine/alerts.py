@@ -13,6 +13,11 @@ Booking suggestions use persistent storage (homeassistant.helpers.storage.Store)
 so that dismissed suggestions survive HA restarts. If the user tapped "Nu" (No)
 on a suggestion, that class ID is persisted and never re-suggested. If the user
 never responded, the suggestion is re-sent after restart.
+
+Snooze ("Mă mai gândesc") uses an in-memory cooldown (default 1 hour).
+After tapping, the suggestion won't re-appear until the cooldown expires,
+then re-triggers on the next coordinator update cycle. After HA restart
+snoozed suggestions re-trigger immediately (same as ignored).
 """
 
 import logging
@@ -46,6 +51,8 @@ from .const import (
     EVENT_MEMBERSHIP_EXPIRY,
     ACTION_BOOK_PREFIX,
     ACTION_DISMISS_PREFIX,
+    ACTION_SNOOZE_PREFIX,
+    DEFAULT_SNOOZE_COOLDOWN_SECONDS,
     DATA_CLASSES,
     DATA_BOOKINGS,
     DATA_ACTIVE_CONTRACT,
@@ -82,6 +89,10 @@ class VivertineClassAlerts:
         )
         self._dismissed_suggestions: set[int] = set()
         self._dismissed_loaded = False
+        # Snooze cooldown: class_id → timestamp when snooze expires.
+        # In-memory only — after HA restart, snoozed classes re-trigger
+        # immediately (same as "ignored" behaviour).
+        self._snoozed_suggestions: dict[int, float] = {}
 
     @property
     def _favorite_names(self) -> set[str]:
@@ -195,6 +206,26 @@ class VivertineClassAlerts:
             "Persisted dismissed suggestion for class %s (total: %d)",
             class_id,
             len(self._dismissed_suggestions),
+        )
+
+    def async_snooze_suggestion(self, class_id: int) -> None:
+        """Snooze a booking suggestion so it re-triggers after a cooldown.
+
+        Unlike dismiss (permanent), snooze is in-memory only and expires
+        after DEFAULT_SNOOZE_COOLDOWN_SECONDS (1 hour).  After the cooldown,
+        the suggestion will re-appear on the next coordinator update cycle.
+        """
+        import time
+
+        until = time.monotonic() + DEFAULT_SNOOZE_COOLDOWN_SECONDS
+        self._snoozed_suggestions[class_id] = until
+        # Remove from _sent_alerts so the suggestion can re-trigger
+        # once the cooldown expires.
+        self._sent_alerts.discard(f"suggest_{class_id}")
+        _LOGGER.info(
+            "Snoozed suggestion for class %s — will re-trigger in %ds",
+            class_id,
+            DEFAULT_SNOOZE_COOLDOWN_SECONDS,
         )
 
     def send_test_notification(self) -> None:
@@ -722,11 +753,23 @@ class VivertineClassAlerts:
                     pass  # keep candidate if we can't parse date
 
             # Skip already suggested (in-memory) or persistently dismissed
+            # or currently snoozed (cooldown not yet expired)
             alert_key = f"suggest_{cls_id}"
             if alert_key in self._sent_alerts:
                 continue
             if cls_id in self._dismissed_suggestions:
                 continue
+
+            # Check snooze cooldown
+            import time
+
+            snooze_until = self._snoozed_suggestions.get(cls_id)
+            if snooze_until is not None:
+                if time.monotonic() < snooze_until:
+                    continue  # still snoozed — skip for now
+                # Cooldown expired — remove from snooze dict and proceed
+                del self._snoozed_suggestions[cls_id]
+
             self._sent_alerts.add(alert_key)
 
             # Build message
@@ -794,7 +837,11 @@ class VivertineClassAlerts:
             actions = [
                 {
                     "action": f"{ACTION_BOOK_PREFIX}{cls_id}",
-                    "title": "Da, rezervă!",
+                    "title": "Da, rezerva!",
+                },
+                {
+                    "action": f"{ACTION_SNOOZE_PREFIX}{cls_id}",
+                    "title": "Ma mai gandesc",
                 },
                 {
                     "action": f"{ACTION_DISMISS_PREFIX}{cls_id}",

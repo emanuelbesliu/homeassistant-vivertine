@@ -73,6 +73,11 @@ EVENT_MEMBERSHIP_EXPIRY = f"{DOMAIN}_membership_expiry"
 # Actionable notification action prefixes
 ACTION_BOOK_PREFIX = "VIVERTINE_BOOK_"
 ACTION_DISMISS_PREFIX = "VIVERTINE_DISMISS_"
+ACTION_SNOOZE_PREFIX = "VIVERTINE_SNOOZE_"
+
+# Snooze cooldown — after tapping "Mă mai gândesc", the suggestion
+# won't re-appear for this many seconds.  Default 1 hour.
+DEFAULT_SNOOZE_COOLDOWN_SECONDS = 3600
 
 # Persistent storage for dismissed booking suggestions
 STORAGE_VERSION = 1
