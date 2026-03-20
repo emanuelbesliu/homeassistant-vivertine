@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.18 (2026-03-20)
+
+### Changed
+- **Suppress booking suggestions when gym is closed** — booking suggestion notifications (including snoozed re-triggers) are no longer sent outside gym opening hours. Uses the existing `gym_busyness` "Inchis" (Closed) state from the OpeningHours API. Snoozed suggestions with expired cooldowns will naturally re-trigger on the first scan cycle after the gym opens
+
+### Technical
+- Added `BUSYNESS_LABEL_CLOSED` and `DATA_GYM_BUSYNESS` imports to `alerts.py`
+- Early return in `_check_booking_suggestions()` when `gym_busyness.label == "Inchis"`
+
 ## 1.0.17 (2026-03-20)
 
 ### Added

@@ -53,6 +53,7 @@ from .const import (
     ACTION_DISMISS_PREFIX,
     ACTION_SNOOZE_PREFIX,
     DEFAULT_SNOOZE_COOLDOWN_SECONDS,
+    BUSYNESS_LABEL_CLOSED,
     DATA_CLASSES,
     DATA_BOOKINGS,
     DATA_ACTIVE_CONTRACT,
@@ -60,6 +61,7 @@ from .const import (
     DATA_NEXT_FAVORITE_INSTRUCTOR_CLASS,
     DATA_RECOMMENDED_CLASS,
     DATA_CLASS_BUDDIES,
+    DATA_GYM_BUSYNESS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -682,6 +684,13 @@ class VivertineClassAlerts:
 
         notify_target = self._notify_service
         if not notify_target:
+            return
+
+        # Suppress suggestions when the gym is closed (e.g., nighttime).
+        # Snoozed suggestions with expired cooldowns will naturally
+        # re-trigger on the first scan after the gym opens.
+        busyness = data.get(DATA_GYM_BUSYNESS, {})
+        if busyness.get("label") == BUSYNESS_LABEL_CLOSED:
             return
 
         # Gather candidate classes with their reason labels
