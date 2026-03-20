@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.12 (2026-03-20)
+
+### Fixed
+- **Buddy detection bug** — buddies were never detected (`is_buddy` always `false`) because `classes_visits` API has no `classId` field. Switched buddy detection to use `bookings` data (which has `classId` for both past and future bookings) instead of `classes_visits`
+- **Performance optimization** — replaced O(n^3) nested-loop buddy detection with O(n) pre-built `person_to_class_ids` index. For each attendee, buddy status is now a single set-difference check instead of scanning all other classes' attendee lists
+
 ## 1.0.11 (2026-03-20)
 
 ### Added

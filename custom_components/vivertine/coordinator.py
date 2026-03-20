@@ -585,8 +585,13 @@ class VivertineDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
               Each attendee: {"name": str, "is_standby": bool, "is_buddy": bool}
 
         Buddy detection: A person is a 'buddy' if they appeared in at
-        least one past class that the user also attended. We cross-reference
-        WhoIsIn entries for past classes with the user's classes_visits.
+        least one past class that the user also booked. We use the
+        bookings endpoint (which has classId for both past and future
+        bookings) to find the user's past class IDs, then cross-reference
+        with WhoIsIn entries for those classes.
+
+        Note: classes_visits does NOT have classId, only className —
+        so we use bookings as the source of past class IDs instead.
         """
         if not who_is_in:
             return {
@@ -595,13 +600,17 @@ class VivertineDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "by_class": {},
             }
 
-        # 1. Get user's active booked class IDs
+        # 1. Separate bookings into all class IDs (for buddy detection)
+        #    and active (non-canceled) class IDs (for attendee display)
+        all_booked_class_ids: set[int] = set()
         active_booked_class_ids: set[int] = set()
         for b in bookings:
+            cid = b.get("classId")
+            if cid is None:
+                continue
+            all_booked_class_ids.add(cid)
             if not b.get("isCanceled", False):
-                cid = b.get("classId")
-                if cid is not None:
-                    active_booked_class_ids.add(cid)
+                active_booked_class_ids.add(cid)
 
         if not active_booked_class_ids:
             return {
@@ -614,16 +623,7 @@ class VivertineDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         user_first = (account.get("firstName") or "").strip().lower()
         user_last = (account.get("lastName") or "").strip().lower()
 
-        # 3. Build set of past class IDs the user attended (from visits)
-        user_visited_class_ids: set[int] = set()
-        for visit in classes_visits:
-            cid = visit.get("classId")
-            if cid is not None:
-                user_visited_class_ids.add(cid)
-
-        # 4. Index all WhoIsIn entries by classId for fast lookup
-        #    Also build a set of "known co-attendee names" from past classes
-        #    (people who appeared in a class the user also visited)
+        # 3. Index all WhoIsIn entries by classId for fast lookup
         who_by_class: dict[int, list[dict[str, Any]]] = {}
         for entry in who_is_in:
             cid = entry.get("classId")
@@ -631,24 +631,24 @@ class VivertineDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 continue
             who_by_class.setdefault(cid, []).append(entry)
 
-        # 5. Build buddy set: names of people who co-attended past classes
-        buddy_names: set[str] = set()
-        for past_cid in user_visited_class_ids:
-            past_attendees = who_by_class.get(past_cid, [])
-            for entry in past_attendees:
+        # 4. Build person-to-classIds index from WhoIsIn for O(1) buddy lookups
+        #    Key: (firstName_lower, lastName_lower), Value: set of classIds
+        #    A person is a "buddy" if they appear in at least one OTHER
+        #    booked class besides the current one being viewed.
+        person_class_ids: dict[tuple[str, str], set[int]] = {}
+        for cid in all_booked_class_ids:
+            for entry in who_by_class.get(cid, []):
                 if entry.get("isCanceled") or entry.get("isDeleted"):
                     continue
-                name = VivertineDataUpdateCoordinator._format_attendee_name(
-                    entry
-                )
-                # Exclude the user themselves
                 e_first = (entry.get("firstName") or "").strip().lower()
                 e_last = (entry.get("lastName") or "").strip().lower()
                 if e_first == user_first and e_last == user_last:
                     continue
-                buddy_names.add(name)
+                person_class_ids.setdefault(
+                    (e_first, e_last), set()
+                ).add(cid)
 
-        # 6. Build attendee lists for each booked class
+        # 5. Build attendee lists for each active booked class
         by_class: dict[int, list[dict[str, Any]]] = {}
         for booked_cid in active_booked_class_ids:
             class_attendees = who_by_class.get(booked_cid, [])
@@ -656,7 +656,6 @@ class VivertineDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             for entry in class_attendees:
                 if entry.get("isCanceled") or entry.get("isDeleted"):
                     continue
-                # Exclude the user themselves
                 e_first = (entry.get("firstName") or "").strip().lower()
                 e_last = (entry.get("lastName") or "").strip().lower()
                 if e_first == user_first and e_last == user_last:
@@ -666,11 +665,17 @@ class VivertineDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         entry
                     )
                 )
+                # Buddy = appears in at least one OTHER user-booked class
+                their_classes = person_class_ids.get(
+                    (e_first, e_last), set()
+                )
+                is_buddy = bool(their_classes - {booked_cid})
+
                 attendees.append(
                     {
                         "name": name,
                         "is_standby": bool(entry.get("isStandby", False)),
-                        "is_buddy": name in buddy_names,
+                        "is_buddy": is_buddy,
                     }
                 )
             # Sort: buddies first, then alphabetical
@@ -679,18 +684,13 @@ class VivertineDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
             by_class[booked_cid] = attendees
 
-        # 7. Determine the "next" booked class (earliest start time)
-        #    We need to find which booked class starts soonest
+        # 6. Determine the "next" booked class (earliest start time)
+        #    The sensor layer will pick the actual "next" one based on
+        #    class start times from DATA_UPCOMING_CLASSES
         next_booked_cid: int | None = None
         next_booked_count = 0
 
-        # Try to find the earliest booked class by matching with
-        # bookings that have class start info from enriched classes
-        # For simplicity, just pick the first booked class that has
-        # attendees (the sensor layer will pick the actual "next" one
-        # based on class start times from DATA_UPCOMING_CLASSES)
         if by_class:
-            # Return the first one; sensor will determine which is "next"
             first_cid = next(iter(by_class))
             next_booked_cid = first_cid
             next_booked_count = len(by_class[first_cid])
