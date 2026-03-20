@@ -32,6 +32,7 @@ from .const import (
     SENSOR_ACTIVE_BOOKINGS,
     SENSOR_LATEST_NOTIFICATION,
     SENSOR_CLASS_BUDDIES,
+    BOOKING_WINDOW_HOURS,
     DATA_ACTIVE_CONTRACT,
     DATA_ACCOUNT,
     DATA_UPCOMING_CLASSES,
@@ -63,6 +64,34 @@ _RO_DAYS = {
     5: "Sâmbătă",
     6: "Duminică",
 }
+
+
+def _is_class_bookable(cls_data: dict[str, Any] | None) -> bool:
+    """Check if a class is within the 24h booking window.
+
+    Returns True if the class starts within the next BOOKING_WINDOW_HOURS
+    and has not already started.
+    """
+    if not cls_data:
+        return False
+
+    start_str = cls_data.get("startDate")
+    if not start_str:
+        return False
+
+    try:
+        start_dt = datetime.fromisoformat(
+            start_str.replace("Z", "+00:00")
+        ).replace(tzinfo=None)
+    except (ValueError, TypeError):
+        return False
+
+    now = datetime.now()
+    if start_dt <= now:
+        return False
+
+    window = timedelta(hours=BOOKING_WINDOW_HOURS)
+    return start_dt <= now + window
 
 
 def _format_class_state(cls_data: dict[str, Any] | None) -> str:
@@ -340,6 +369,8 @@ class VivertineSensor(
                 attrs["available_spots"] = next_cls.get("available_spots")
                 attrs["attendees"] = next_cls.get("attendeesCount")
                 attrs["limit"] = next_cls.get("attendeesLimit")
+                attrs["class_id"] = next_cls.get("id")
+                attrs["bookable"] = _is_class_bookable(next_cls)
                 # Enrich with who's going (if this class is booked)
                 buddies = data.get(DATA_CLASS_BUDDIES, {})
                 by_class = buddies.get("by_class", {})
@@ -409,6 +440,8 @@ class VivertineSensor(
                 attrs["available_spots"] = next_fav.get("available_spots")
                 attrs["attendees"] = next_fav.get("attendeesCount")
                 attrs["limit"] = next_fav.get("attendeesLimit")
+                attrs["class_id"] = next_fav.get("id")
+                attrs["bookable"] = _is_class_bookable(next_fav)
                 # Buddies going to this class
                 buddies_data = data.get(DATA_CLASS_BUDDIES, {})
                 bbc = buddies_data.get("buddies_by_class", {})
@@ -429,6 +462,8 @@ class VivertineSensor(
                 )
                 attrs["attendees"] = next_fav_inst.get("attendeesCount")
                 attrs["limit"] = next_fav_inst.get("attendeesLimit")
+                attrs["class_id"] = next_fav_inst.get("id")
+                attrs["bookable"] = _is_class_bookable(next_fav_inst)
                 # Buddies going to this class
                 buddies_data = data.get(DATA_CLASS_BUDDIES, {})
                 bbc = buddies_data.get("buddies_by_class", {})
@@ -455,6 +490,8 @@ class VivertineSensor(
                 attrs["type_attendance_count"] = recommended.get(
                     "_type_attendance_count"
                 )
+                attrs["class_id"] = recommended.get("id")
+                attrs["bookable"] = _is_class_bookable(recommended)
                 # Buddies going to this class
                 buddies_data = data.get(DATA_CLASS_BUDDIES, {})
                 bbc = buddies_data.get("buddies_by_class", {})
@@ -607,11 +644,13 @@ class VivertineScheduleSensor(
                 end_time = "?"
 
             entry = {
+                "class_id": cls.get("id"),
                 "time": f"{time_str}-{end_time}",
                 "class": cls.get("class_type_name", "Unknown"),
                 "instructor": cls.get("instructor_name", "N/A"),
                 "zone": cls.get("clubZone", ""),
                 "spots": cls.get("available_spots"),
+                "bookable": _is_class_bookable(cls),
             }
 
             by_day.setdefault(day_key, []).append(entry)

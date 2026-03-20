@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.0.14 (2026-03-20)
+
+### Added
+- **24-hour booking window enforcement** — Vivertine/PerfectGym only allows bookings within 24 hours of class start. The integration now validates this at every level:
+  - **Booking suggestions** (`alerts.py`) — actionable push notifications are only sent for classes starting within 24h (not farther out)
+  - **Book class service** (`vivertine.book_class`) — rejects booking attempts for classes >24h away with a clear Romanian error message
+  - **Notification "Da, rezervă!" button** — validates 24h window before calling the API; sends "Rezervare indisponibilă" notification if too early
+- **`bookable` attribute** on `next_class`, `next_favorite_class`, `next_favorite_instructor_class`, `recommended_class` sensors — `true`/`false` flag indicating whether the class is within the 24h booking window
+- **`class_id` attribute** on `next_class`, `next_favorite_class`, `next_favorite_instructor_class`, `recommended_class`, and all schedule sensor entries — exposes the numeric class ID for use with `vivertine.book_class` service
+- **`bookable` flag in schedule sensor** — each class entry in the upcoming schedule now shows whether it can be booked right now
+
+### Technical
+- New constant `BOOKING_WINDOW_HOURS = 24` in `const.py`
+- New helper `_check_booking_window()` in `__init__.py` — looks up class start time from coordinator data, returns `None` if bookable or a Romanian error message if not
+- New helper `_is_class_bookable()` in `sensor.py` — pure function for the `bookable` attribute computation
+- Booking suggestion dedup now also skips classes that already started
+
 ## 1.0.13 (2026-03-20)
 
 ### Added

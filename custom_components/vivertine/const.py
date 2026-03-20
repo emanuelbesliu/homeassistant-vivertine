@@ -42,6 +42,10 @@ MIN_UPDATE_INTERVAL = 60
 MAX_UPDATE_INTERVAL = 3600
 DEFAULT_LOW_SPOTS_THRESHOLD = 5
 
+# Booking window — Vivertine/PerfectGym only allows bookings within this
+# many hours before the class starts. Attempts to book earlier are rejected.
+BOOKING_WINDOW_HOURS = 24
+
 # Alert events
 EVENT_CLASS_CANCELLED = f"{DOMAIN}_class_cancelled"
 EVENT_CLASS_MOVED = f"{DOMAIN}_class_moved"

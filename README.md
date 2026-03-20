@@ -88,7 +88,7 @@ All class sensors (`next_class`, `next_favorite_class`, `next_favorite_instructo
 - **Tomorrow**: `Yoga — Mihai Ion @ Mâine 10:00`
 - **Other days**: `TRX — Ana Popescu @ Miercuri 19:00`
 
-Day names are shown in Romanian. Each class sensor also provides detailed attributes (instructor, start/end time, zone, available spots, attendees, limit).
+Day names are shown in Romanian. Each class sensor also provides detailed attributes (instructor, start/end time, zone, available spots, attendees, limit, `class_id`, `bookable`).
 
 ### Recommended class sensor
 
@@ -125,9 +125,18 @@ When the integration detects an unbooked class that matches your recommendations
   - **"Da, rezervă!"** — books the class automatically and sends a confirmation notification
   - **"Nu"** — dismisses the suggestion
 - **Deduplication**: if multiple recommendation types point to the same class, only one notification is sent with combined reasons
-- **Filters**: skips already-booked classes, classes with no spots, and classes already suggested this session
+- **Filters**: skips already-booked classes, classes with no spots, classes already suggested this session, and classes more than 24 hours away (outside booking window)
 - **Requires**: a notification service configured in the integration options (e.g., `mobile_app_iphone`)
 - **Works on**: iOS and Android via the HA Companion App
+
+### 24-hour booking window
+
+Vivertine (PerfectGym) only allows class bookings within **24 hours** of the class start time. The integration enforces this at every level:
+
+- **Booking suggestions** are only sent for classes starting within 24h
+- **`vivertine.book_class` service** rejects attempts to book classes >24h away with a clear error message
+- **Notification "Da, rezervă!" button** validates the window before calling the API
+- **`bookable` attribute** on all class sensors and schedule entries shows `true`/`false` based on the 24h window
 
 ## Services
 

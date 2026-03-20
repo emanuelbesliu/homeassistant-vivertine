@@ -1,6 +1,7 @@
 """The Vivertine Gym integration."""
 
 import logging
+from datetime import datetime, timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall, Event
@@ -13,6 +14,8 @@ from .const import (
     CONF_EMAIL,
     CONF_PASSWORD,
     CONF_NOTIFY_SERVICE,
+    BOOKING_WINDOW_HOURS,
+    DATA_CLASSES,
     SERVICE_SEND_TEST_NOTIFICATION,
     SERVICE_BOOK_CLASS,
     SERVICE_CANCEL_BOOKING,
@@ -22,6 +25,51 @@ from .const import (
 from .coordinator import VivertineDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _check_booking_window(coordinator, class_id: int) -> str | None:
+    """Check if a class is within the 24h booking window.
+
+    Returns None if bookable, or a Romanian error message if not.
+    """
+    if not coordinator or not coordinator.data:
+        return None  # can't validate, let the API decide
+
+    classes = coordinator.data.get(DATA_CLASSES, [])
+    target_cls = None
+    for cls in classes:
+        if cls.get("id") == class_id:
+            target_cls = cls
+            break
+
+    if target_cls is None:
+        return None  # class not found in data, let the API decide
+
+    start_str = target_cls.get("startDate")
+    if not start_str:
+        return None
+
+    try:
+        start_dt = datetime.fromisoformat(
+            start_str.replace("Z", "+00:00")
+        ).replace(tzinfo=None)
+    except (ValueError, TypeError):
+        return None
+
+    now = datetime.now()
+
+    if start_dt <= now:
+        return "Clasa a început deja."
+
+    window = timedelta(hours=BOOKING_WINDOW_HOURS)
+    if start_dt > now + window:
+        hours_until = (start_dt - now).total_seconds() / 3600
+        return (
+            f"Rezervările se pot face cu maxim {BOOKING_WINDOW_HOURS}h "
+            f"înainte de clasă. Mai sunt {hours_until:.0f}h până la clasă."
+        )
+
+    return None
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -66,6 +114,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 return
 
             _LOGGER.info("Booking class %s from notification action", class_id)
+            # Validate 24h booking window
+            window_error = _check_booking_window(coordinator, class_id)
+            if window_error:
+                _LOGGER.warning(
+                    "Cannot book class %s from notification: %s",
+                    class_id,
+                    window_error,
+                )
+                notify_target = entry.options.get(
+                    CONF_NOTIFY_SERVICE,
+                    entry.data.get(CONF_NOTIFY_SERVICE, ""),
+                )
+                if notify_target:
+                    await hass.services.async_call(
+                        "notify",
+                        notify_target,
+                        {
+                            "title": "Vivertine: Rezervare indisponibilă",
+                            "message": window_error,
+                        },
+                    )
+                return
+
             try:
                 await hass.async_add_executor_job(api.book_class, class_id)
                 _LOGGER.info("Successfully booked class %s", class_id)
@@ -149,6 +220,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 api_inst = edata.get("api")
                 coord = edata.get("coordinator")
                 if api_inst:
+                    # Validate 24h booking window
+                    window_error = _check_booking_window(coord, class_id)
+                    if window_error:
+                        _LOGGER.warning(
+                            "Cannot book class %s: %s",
+                            class_id,
+                            window_error,
+                        )
+                        raise VivertineApiError(window_error)
+
                     try:
                         result = await hass.async_add_executor_job(
                             api_inst.book_class, class_id

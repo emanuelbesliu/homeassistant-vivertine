@@ -25,6 +25,7 @@ from .const import (
     CONF_NOTIFY_SERVICE,
     CONF_LOW_SPOTS_THRESHOLD,
     DEFAULT_LOW_SPOTS_THRESHOLD,
+    BOOKING_WINDOW_HOURS,
     EVENT_CLASS_CANCELLED,
     EVENT_CLASS_MOVED,
     EVENT_CLASS_INSTRUCTOR_CHANGED,
@@ -478,6 +479,9 @@ class VivertineClassAlerts:
             data.get(DATA_CLASS_BUDDIES, {}).get("buddies_by_class", {})
         )
 
+        now = datetime.now()
+        booking_window = timedelta(hours=BOOKING_WINDOW_HOURS)
+
         for cls_id, info in candidates.items():
             cls = info["cls"]
             reasons = info["reasons"]
@@ -490,6 +494,20 @@ class VivertineClassAlerts:
             spots = cls.get("available_spots")
             if spots is not None and spots <= 0:
                 continue
+
+            # Skip classes outside the booking window (>24h away)
+            start_str = cls.get("startDate")
+            if start_str:
+                try:
+                    start_dt = datetime.fromisoformat(
+                        start_str.replace("Z", "+00:00")
+                    ).replace(tzinfo=None)
+                    if start_dt > now + booking_window:
+                        continue
+                    if start_dt <= now:
+                        continue  # already started
+                except (ValueError, TypeError):
+                    pass  # keep candidate if we can't parse date
 
             # Skip already suggested
             alert_key = f"suggest_{cls_id}"
