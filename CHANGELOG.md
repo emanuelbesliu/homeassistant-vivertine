@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.8 (2026-03-20)
+
+### Added
+- Full CI/CD pipeline: 8 GitHub Actions workflows (validate, release, release-please, dependencies, codeql, stale, validate-workflows, dependabot-auto-merge)
+- Dependabot configuration for automated dependency updates (pip + github-actions)
+- `requirements.txt` for dependency validation and tracking
+- Repository topics for HACS compatibility (`hacs`, `home-assistant`, `custom-component`, `smart-home`, `vivertine`, `gym`, `perfectgym`)
+
 ## 1.0.7 (2026-03-20)
 
 ### Fixed
