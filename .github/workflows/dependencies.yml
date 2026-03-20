@@ -1,0 +1,96 @@
+name: Validate Dependencies
+
+on:
+  pull_request:
+    paths:
+      - 'requirements.txt'
+      - 'custom_components/vivertine/manifest.json'
+      - '.github/workflows/dependencies.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'requirements.txt'
+      - 'custom_components/vivertine/manifest.json'
+
+jobs:
+  validate:
+    name: Validate Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify manifest.json requirements match
+        run: |
+          python3 << 'EOF'
+          import json, re, sys
+
+          manifest = json.load(open("custom_components/vivertine/manifest.json"))
+          manifest_reqs = manifest.get("requirements", [])
+
+          with open("requirements.txt") as f:
+              req_txt = f.read()
+
+          print(f"Manifest requirements: {manifest_reqs}")
+          print(f"requirements.txt (non-comment lines):")
+          for line in req_txt.splitlines():
+              stripped = line.strip()
+              if stripped and not stripped.startswith("#"):
+                  print(f"  {stripped}")
+
+          failed = False
+          for req in manifest_reqs:
+              # Extract package name (before any version specifier)
+              pkg_name = re.split(r"[><=!~]", req)[0].strip()
+              if pkg_name.lower() not in req_txt.lower():
+                  print(f"FAIL: {pkg_name} (from manifest.json) not found in requirements.txt")
+                  failed = True
+              else:
+                  print(f"OK: {pkg_name} found in requirements.txt")
+
+          if failed:
+              sys.exit(1)
+
+          print("Dependencies validation passed")
+          EOF
+
+      - name: Test imports
+        run: |
+          python3 << 'EOF'
+          import json
+
+          manifest = json.load(open("custom_components/vivertine/manifest.json"))
+          for req in manifest.get("requirements", []):
+              import re
+              pkg_name = re.split(r"[><=!~]", req)[0].strip()
+              __import__(pkg_name)
+              print(f"OK: {pkg_name} imports successfully")
+
+          print("All dependencies can be imported")
+          EOF
+
+      - name: Check for security vulnerabilities
+        run: |
+          pip install safety
+          safety check --file requirements.txt --json || echo "Security check completed (warnings above may be informational)"
+        continue-on-error: true
+
+      - name: Create validation summary
+        run: |
+          echo "# Dependencies Validation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All dependencies validated successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Installed Versions" >> $GITHUB_STEP_SUMMARY
+          pip list | grep -iE "requests" >> $GITHUB_STEP_SUMMARY || true

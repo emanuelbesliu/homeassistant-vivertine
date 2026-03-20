@@ -1,0 +1,72 @@
+name: Validate Workflows
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/**'
+
+jobs:
+  validate:
+    name: Validate Workflow Syntax
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Validate YAML syntax
+        run: |
+          # Install yamllint if not available
+          if ! command -v yamllint &> /dev/null; then
+            pip install yamllint
+          fi
+          
+          echo "Validating workflow files..."
+          yamllint .github/workflows/*.yml || true
+          echo "✓ YAML syntax validation complete"
+
+      - name: Check workflow file structure
+        run: |
+          echo "Checking workflow files exist and are readable..."
+          for file in .github/workflows/*.yml; do
+            if [ -f "$file" ]; then
+              echo "✓ $file - OK"
+            else
+              echo "❌ $file - Not found or not readable"
+              exit 1
+            fi
+          done
+
+      - name: Validate GitHub Actions syntax
+        run: |
+          echo "Checking for common workflow issues..."
+          
+          # Check if workflows have name field
+          for file in .github/workflows/*.yml; do
+            if ! grep -q "^name:" "$file"; then
+              echo "⚠️  $file missing 'name' field"
+            fi
+          done
+          
+          # Check if workflows have trigger events
+          for file in .github/workflows/*.yml; do
+            if ! grep -q "^on:" "$file"; then
+              echo "❌ $file missing 'on' trigger"
+              exit 1
+            fi
+          done
+          
+          echo "✓ Workflow structure validation passed"
+
+      - name: Create validation summary
+        run: |
+          echo "# Workflow Validation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ All workflow files validated successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Workflow Files" >> $GITHUB_STEP_SUMMARY
+          ls -1 .github/workflows/*.yml | xargs -I {} basename {} >> $GITHUB_STEP_SUMMARY

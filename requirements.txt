@@ -1,0 +1,11 @@
+# Vivertine Home Assistant Integration Requirements
+# This file is used by Dependabot to track dependency updates
+
+# Core dependencies (from manifest.json)
+requests>=2.31.0
+
+# Development/testing dependencies (optional)
+# homeassistant>=2023.1.0  # Commented out as HA is the runtime environment
+# voluptuous>=0.13.1       # Included with Home Assistant
+
+# Note: This file triggers dependency validation workflow

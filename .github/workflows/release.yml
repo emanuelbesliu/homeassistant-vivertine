@@ -1,0 +1,76 @@
+name: Validate Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  validate:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install homeassistant aiohttp voluptuous
+
+      - name: Validate Python syntax
+        run: |
+          FAILED=0
+          for pyfile in custom_components/vivertine/*.py; do
+            echo -n "Checking ${pyfile}... "
+            if python -m py_compile "$pyfile" 2>&1; then
+              echo "OK"
+            else
+              echo "FAILED"
+              FAILED=1
+            fi
+          done
+          if [ $FAILED -eq 1 ]; then
+            echo "::error::Python syntax validation failed"
+            exit 1
+          fi
+          echo "✓ Python syntax validation passed"
+
+      - name: Check manifest version matches release
+        run: |
+          RELEASE_TAG="${GITHUB_REF#refs/tags/v}"
+          MANIFEST_VERSION=$(python -c "import json; print(json.load(open('custom_components/vivertine/manifest.json'))['version'])")
+          
+          if [ "$RELEASE_TAG" != "$MANIFEST_VERSION" ]; then
+            echo "❌ Version mismatch!"
+            echo "Release tag: v$RELEASE_TAG"
+            echo "Manifest version: $MANIFEST_VERSION"
+            exit 1
+          fi
+          
+          echo "✓ Version check passed: $MANIFEST_VERSION"
+
+      - name: Validate HACS configuration
+        run: |
+          if [ ! -f "hacs.json" ]; then
+            echo "❌ hacs.json not found"
+            exit 1
+          fi
+          python -c "import json; json.load(open('hacs.json'))"
+          echo "✓ HACS configuration valid"
+
+      - name: Create release summary
+        run: |
+          echo "# Release v$RELEASE_TAG" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ All validations passed!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Python syntax: ✓" >> $GITHUB_STEP_SUMMARY
+          echo "- Version match: ✓" >> $GITHUB_STEP_SUMMARY
+          echo "- HACS config: ✓" >> $GITHUB_STEP_SUMMARY
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
