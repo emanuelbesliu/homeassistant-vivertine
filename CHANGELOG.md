@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.15 (2026-03-20)
+
+### Added
+- **Membership expiry notifications** — configurable reminders at specific day milestones (default: 60, 30, 14, 7 days) before expiry, plus daily notifications when days remaining drops below a threshold (default: 7 days). Also notifies on the actual expiry day (day 0). Never sends notifications after expiry. Configurable via options: `expiry_reminder_days` (comma-separated) and `expiry_daily_threshold` (1-30)
+- **Gym busyness sensor** (`sensor.vivertine_gym_busyness`) — estimates current gym busyness from class attendee counts in a configurable time window (default: 4 hours). State is a categorical label: Liber (<30%), Moderat (30-70%), Aglomerat (>70%) based on total attendees vs total capacity. Attributes include occupancy_percent, total_attendees, total_capacity, classes_count, and a per-class breakdown (capped at 10)
+- New HA event: `vivertine_membership_expiry` — fired alongside the notification for automation use
+- New options: `expiry_reminder_days`, `expiry_daily_threshold`, `busyness_window_hours`
+
+### Fixed
+- **Class buddies 16KB recorder fix** — the `booked_classes` attribute was storing full attendee lists for ALL bookings (including ~70 past ones), exceeding HA's 16384-byte state attribute limit. Now filters to only upcoming booked classes (max 5), stores only buddy names instead of full attendee dicts, and caps `who_is_going` at 10 entries with a `who_is_going_total` count
+
 ## 1.0.14 (2026-03-20)
 
 ### Added

@@ -23,6 +23,8 @@ Custom Home Assistant integration for **Vivertine Gym** (Iași, Romania), built 
   - Class time changed
   - Instructor changed
   - Available spots below threshold (default: 5)
+- **Membership expiry notifications** — configurable reminders at milestone days before expiry, plus daily alerts when close to expiring
+- **Gym busyness** — estimates current gym busyness from class attendee counts (Liber/Moderat/Aglomerat)
 - **Actionable booking suggestions** — push notifications with "Book" / "Dismiss" buttons when recommended or favorite classes have spots available, with buddy info included
 
 ## Installation
@@ -58,6 +60,9 @@ After setup, configure options via the integration's **Configure** button:
 | Favorite instructors | Comma-separated instructor names to monitor | *(empty)* |
 | Notification service | HA notify service target (e.g., `mobile_app_iphone`) | *(empty)* |
 | Low spots threshold | Alert when spots drop below this | 5 |
+| Expiry reminder days | Comma-separated day milestones for expiry reminders | 60,30,14,7 |
+| Expiry daily threshold | Send daily reminders when days left is below this | 7 |
+| Busyness window hours | Time window (1-8h) for gym busyness calculation | 4 |
 
 ## Sensors
 
@@ -78,6 +83,7 @@ After setup, configure options via the integration's **Configure** button:
 | `sensor.vivertine_active_bookings` | Number of active class bookings |
 | `sensor.vivertine_latest_notification` | Latest gym notification subject/content |
 | `sensor.vivertine_class_buddies` | Attendees going to your next booked class (with buddy flags) |
+| `sensor.vivertine_gym_busyness` | Estimated gym busyness based on class attendees (Liber/Moderat/Aglomerat) |
 | `sensor.vivertine_upcoming_schedule` | Full upcoming schedule (in attributes) |
 
 ### Class sensor display format
@@ -106,14 +112,43 @@ The `class_buddies` sensor shows who's signed up for your booked classes:
 - **State**: attendee count for your next booked class (excludes yourself)
 - **Attributes**:
   - `next_class_name`, `next_class_instructor`, `next_class_start` — details of the next booked class
-  - `who_is_going` — list of attendees for the next booked class, each with `name`, `is_standby`, `is_buddy`
+  - `who_is_going` — list of attendees for the next booked class, each with `name`, `is_standby`, `is_buddy` (capped at 10 entries)
+  - `who_is_going_total` — total number of attendees (useful when list is capped)
   - `buddy_count` — number of buddies (people you've attended with before) in the next class
   - `standby_count` — number of people on standby
-  - `booked_classes` — full attendee data for all your booked classes
+  - `booked_classes` — upcoming booked classes (max 5) with buddy names only
 - **Buddy detection**: cross-references attendees with your visit history — anyone who appeared in a past class you also attended is flagged as `is_buddy: true`
 - **Privacy**: names shown as first name + last initial (e.g. "Ana P."), no photos or social media
 - **Enrichment**: the `next_class` and `active_bookings` sensors also gain `who_is_going` in their attributes
 - **Buddies on recommendations**: the `next_favorite_class`, `next_favorite_instructor_class`, and `recommended_class` sensors include a `buddies_going` attribute showing which buddies are signed up
+- **Recorder-safe**: `who_is_going` is capped at 10 entries (with `who_is_going_total` for the full count), and `booked_classes` stores only upcoming classes (max 5) with buddy names only — keeping state attributes under HA's 16KB recorder limit
+
+### Gym Busyness sensor
+
+The `gym_busyness` sensor estimates how busy the gym is based on class attendee counts in a configurable time window:
+
+- **State**: categorical label — `Liber` (<30%), `Moderat` (30-70%), `Aglomerat` (>70%) based on total attendees vs total capacity across all classes in the window
+- **Window**: configurable via options (`busyness_window_hours`, default 4, range 1-8 hours from now)
+- **Attributes**:
+  - `total_attendees` — sum of attendee counts across classes in the window
+  - `total_capacity` — sum of attendee limits across classes in the window
+  - `occupancy_percent` — attendees/capacity as a percentage (0-100)
+  - `classes_count` — number of classes in the window
+  - `window_hours` — configured window size
+  - `classes` — per-class breakdown (class name, instructor, time, attendees, capacity) capped at 10 entries
+- **Why class-based**: Vivertine's PerfectGym instance returns `null` for real occupancy endpoints, so class attendees in the near-future window is the best available proxy for gym activity
+
+### Membership expiry notifications
+
+The integration sends push notifications and fires HA events as your membership expiry date approaches:
+
+- **Milestone reminders**: notifications at configurable day milestones (default: 60, 30, 14, 7 days before expiry)
+- **Daily reminders**: when days remaining drops below a configurable threshold (default: 7 days), a notification is sent on every coordinator update (once per day, deduplicated)
+- **Expiry day alert**: notifies on the actual expiry day (day 0)
+- **No post-expiry spam**: once membership has expired, no further notifications are sent
+- **Deduplication**: each milestone/daily notification is sent only once per session (tracked by dedup key `"expiry_{days_left}"`)
+- **Delivery**: persistent notification + mobile push (requires notification service configured) + `vivertine_membership_expiry` HA event
+- **Configuration**: `expiry_reminder_days` (comma-separated day numbers) and `expiry_daily_threshold` (1-30) in integration options
 
 ### Actionable booking suggestions
 
@@ -157,6 +192,7 @@ When favorite classes or favorite instructors are configured, the integration fi
 | `vivertine_class_instructor_changed` | Instructor changed for a favorite class |
 | `vivertine_class_low_spots` | Available spots dropped below threshold |
 | `vivertine_booking_suggestion` | Booking suggestion for a recommended/favorite class |
+| `vivertine_membership_expiry` | Membership expiry reminder (at configured day milestones) |
 
 Each event includes: `class_name`, `instructor`, `start_date`, `message`, `title`.
 

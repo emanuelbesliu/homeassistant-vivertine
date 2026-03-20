@@ -35,12 +35,27 @@ CONF_FAVORITE_CLASSES = "favorite_classes"
 CONF_FAVORITE_INSTRUCTORS = "favorite_instructors"
 CONF_NOTIFY_SERVICE = "notify_service"
 CONF_LOW_SPOTS_THRESHOLD = "low_spots_threshold"
+CONF_EXPIRY_REMINDER_DAYS = "expiry_reminder_days"
+CONF_EXPIRY_DAILY_THRESHOLD = "expiry_daily_threshold"
+CONF_BUSYNESS_WINDOW_HOURS = "busyness_window_hours"
 
 # Defaults
 DEFAULT_UPDATE_INTERVAL = 300  # 5 minutes
 MIN_UPDATE_INTERVAL = 60
 MAX_UPDATE_INTERVAL = 3600
 DEFAULT_LOW_SPOTS_THRESHOLD = 5
+DEFAULT_EXPIRY_REMINDER_DAYS = "60,30,14,7"
+DEFAULT_EXPIRY_DAILY_THRESHOLD = 7
+DEFAULT_BUSYNESS_WINDOW_HOURS = 4
+MIN_BUSYNESS_WINDOW_HOURS = 1
+MAX_BUSYNESS_WINDOW_HOURS = 8
+
+# Gym busyness thresholds (percentage of total class capacity)
+BUSYNESS_THRESHOLD_LOW = 30  # <30% = Liber
+BUSYNESS_THRESHOLD_HIGH = 70  # 30-70% = Moderat, >70% = Aglomerat
+BUSYNESS_LABEL_FREE = "Liber"
+BUSYNESS_LABEL_MODERATE = "Moderat"
+BUSYNESS_LABEL_BUSY = "Aglomerat"
 
 # Booking window — Vivertine/PerfectGym only allows bookings within this
 # many hours before the class starts. Attempts to book earlier are rejected.
@@ -52,6 +67,7 @@ EVENT_CLASS_MOVED = f"{DOMAIN}_class_moved"
 EVENT_CLASS_INSTRUCTOR_CHANGED = f"{DOMAIN}_class_instructor_changed"
 EVENT_CLASS_LOW_SPOTS = f"{DOMAIN}_class_low_spots"
 EVENT_BOOKING_SUGGESTION = f"{DOMAIN}_booking_suggestion"
+EVENT_MEMBERSHIP_EXPIRY = f"{DOMAIN}_membership_expiry"
 
 # Actionable notification action prefixes
 ACTION_BOOK_PREFIX = "VIVERTINE_BOOK_"
@@ -82,6 +98,7 @@ DATA_WEEKLY_VISITS = "weekly_visits"
 DATA_MONTHLY_VISITS = "monthly_visits"
 DATA_NOTIFICATIONS = "notifications"
 DATA_CLASS_BUDDIES = "class_buddies"
+DATA_GYM_BUSYNESS = "gym_busyness"
 
 # Contract statuses from API
 CONTRACT_STATUS_CURRENT = "Current"
@@ -105,6 +122,7 @@ SENSOR_NEXT_FAVORITE_INSTRUCTOR_CLASS = "next_favorite_instructor_class"
 SENSOR_RECOMMENDED_CLASS = "recommended_class"
 SENSOR_LATEST_NOTIFICATION = "latest_notification"
 SENSOR_CLASS_BUDDIES = "class_buddies"
+SENSOR_GYM_BUSYNESS = "gym_busyness"
 
 # Service names
 SERVICE_SEND_TEST_NOTIFICATION = "send_test_notification"
@@ -200,6 +218,12 @@ SENSOR_TYPES = {
         "name": "Class Buddies",
         "icon": "mdi:account-group",
         "unit": "people",
+        "device_class": None,
+    },
+    SENSOR_GYM_BUSYNESS: {
+        "name": "Gym Busyness",
+        "icon": "mdi:account-multiple",
+        "unit": None,
         "device_class": None,
     },
 }

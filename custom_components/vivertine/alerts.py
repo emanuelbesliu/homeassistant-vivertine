@@ -24,17 +24,23 @@ from .const import (
     CONF_FAVORITE_INSTRUCTORS,
     CONF_NOTIFY_SERVICE,
     CONF_LOW_SPOTS_THRESHOLD,
+    CONF_EXPIRY_REMINDER_DAYS,
+    CONF_EXPIRY_DAILY_THRESHOLD,
     DEFAULT_LOW_SPOTS_THRESHOLD,
+    DEFAULT_EXPIRY_REMINDER_DAYS,
+    DEFAULT_EXPIRY_DAILY_THRESHOLD,
     BOOKING_WINDOW_HOURS,
     EVENT_CLASS_CANCELLED,
     EVENT_CLASS_MOVED,
     EVENT_CLASS_INSTRUCTOR_CHANGED,
     EVENT_CLASS_LOW_SPOTS,
     EVENT_BOOKING_SUGGESTION,
+    EVENT_MEMBERSHIP_EXPIRY,
     ACTION_BOOK_PREFIX,
     ACTION_DISMISS_PREFIX,
     DATA_CLASSES,
     DATA_BOOKINGS,
+    DATA_ACTIVE_CONTRACT,
     DATA_NEXT_FAVORITE_CLASS,
     DATA_NEXT_FAVORITE_INSTRUCTOR_CLASS,
     DATA_RECOMMENDED_CLASS,
@@ -110,6 +116,34 @@ class VivertineClassAlerts:
             ),
         )
 
+    @property
+    def _expiry_reminder_days(self) -> set[int]:
+        """Get the set of days-before-expiry at which to send reminders."""
+        raw = self._entry.options.get(
+            CONF_EXPIRY_REMINDER_DAYS,
+            self._entry.data.get(
+                CONF_EXPIRY_REMINDER_DAYS, DEFAULT_EXPIRY_REMINDER_DAYS
+            ),
+        )
+        if not raw:
+            return set()
+        result: set[int] = set()
+        for part in raw.split(","):
+            part = part.strip()
+            if part.isdigit():
+                result.add(int(part))
+        return result
+
+    @property
+    def _expiry_daily_threshold(self) -> int:
+        """Get the threshold below which daily expiry reminders are sent."""
+        return self._entry.options.get(
+            CONF_EXPIRY_DAILY_THRESHOLD,
+            self._entry.data.get(
+                CONF_EXPIRY_DAILY_THRESHOLD, DEFAULT_EXPIRY_DAILY_THRESHOLD
+            ),
+        )
+
     def register(self, coordinator: DataUpdateCoordinator) -> None:
         """Register listener on coordinator updates."""
         self._unsub = coordinator.async_add_listener(self._on_update)
@@ -140,17 +174,20 @@ class VivertineClassAlerts:
     @callback
     def _on_update(self) -> None:
         """Handle coordinator data update — check for class changes."""
-        favorites = self._favorite_names
-        fav_instructors = self._favorite_instructor_names
-        if not favorites and not fav_instructors:
-            return
-
         entry_data = self._hass.data.get(DOMAIN, {}).get(self._entry.entry_id)
         if not entry_data:
             return
 
         coordinator = entry_data.get("coordinator")
         if not coordinator or not coordinator.data:
+            return
+
+        # Check membership expiry (runs regardless of favorites config)
+        self._check_membership_expiry(coordinator)
+
+        favorites = self._favorite_names
+        fav_instructors = self._favorite_instructor_names
+        if not favorites and not fav_instructors:
             return
 
         # Use the full enriched class list (includes deleted classes
@@ -423,6 +460,138 @@ class VivertineClassAlerts:
             _LOGGER.warning(
                 "Failed to send notification via notify.%s", target
             )
+
+    def _check_membership_expiry(
+        self,
+        coordinator: DataUpdateCoordinator,
+    ) -> None:
+        """Check if membership expiry reminders should be sent.
+
+        Sends notifications at configured day thresholds (e.g., 60, 30, 14, 7)
+        and daily when days_left <= daily_threshold. Also notifies on day 0
+        (the actual expiry day). Never sends after expiry (days_left < 0 is
+        clamped to 0 by the coordinator, and day-0 is deduped).
+        """
+        data = coordinator.data
+        if not data:
+            return
+
+        contract = data.get(DATA_ACTIVE_CONTRACT)
+        if not contract:
+            return
+
+        days_left = contract.get("days_left")
+        if days_left is None:
+            return
+
+        # Don't send notifications after expiry — days_left is clamped to 0
+        # by the coordinator, so once we send the day-0 alert, we stop
+        # (dedup key "expiry_0" prevents re-sending).
+        # If there's no active contract at all, we already returned above.
+
+        plan_name = contract.get("plan_name", "Abonament")
+        end_date = contract.get("endDate", "")
+
+        # Format end date for display
+        end_display = self._format_expiry_date(end_date)
+
+        reminder_days = self._expiry_reminder_days
+        daily_threshold = self._expiry_daily_threshold
+
+        should_notify = False
+
+        # Check specific day thresholds (e.g., 60, 30, 14, 7)
+        if days_left in reminder_days:
+            should_notify = True
+
+        # Check daily threshold (notify every day when days_left <= threshold)
+        if days_left <= daily_threshold:
+            should_notify = True
+
+        # Also notify on day 0 (the actual expiry day)
+        if days_left == 0:
+            should_notify = True
+
+        if not should_notify:
+            return
+
+        # Dedup: one notification per days_left value
+        alert_key = f"expiry_{days_left}"
+        if alert_key in self._sent_alerts:
+            return
+        self._sent_alerts.add(alert_key)
+
+        # Build Romanian message
+        if days_left == 0:
+            title = "Abonament expirat"
+            message = (
+                f"Abonamentul tău \"{plan_name}\" expiră astăzi ({end_display})! "
+                f"Reînnoiește-l pentru a continua să mergi la sală."
+            )
+        elif days_left == 1:
+            title = "Abonament expiră mâine"
+            message = (
+                f"Abonamentul tău \"{plan_name}\" expiră mâine ({end_display}). "
+                f"Mai ai doar 1 zi!"
+            )
+        elif days_left <= daily_threshold:
+            title = f"Abonament expiră în {days_left} zile"
+            message = (
+                f"Abonamentul tău \"{plan_name}\" expiră pe {end_display}. "
+                f"Mai ai doar {days_left} zile!"
+            )
+        else:
+            title = f"Abonament expiră în {days_left} zile"
+            message = (
+                f"Abonamentul tău \"{plan_name}\" expiră pe {end_display}. "
+                f"Mai ai {days_left} zile rămase."
+            )
+
+        # Fire HA event
+        event_data = {
+            "entry_id": self._entry.entry_id,
+            "days_left": days_left,
+            "plan_name": plan_name,
+            "end_date": end_date,
+            "title": title,
+            "message": message,
+        }
+        self._hass.bus.async_fire(EVENT_MEMBERSHIP_EXPIRY, event_data)
+        _LOGGER.info(
+            "Vivertine membership expiry alert: %d days left", days_left
+        )
+
+        # Persistent notification
+        notification_id = f"vivertine_expiry_{days_left}"
+        self._hass.async_create_task(
+            self._hass.services.async_call(
+                "persistent_notification",
+                "create",
+                {
+                    "message": message,
+                    "title": f"Vivertine: {title}",
+                    "notification_id": notification_id,
+                },
+            )
+        )
+
+        # Mobile notification
+        notify_target = self._notify_service
+        if notify_target:
+            self._hass.async_create_task(
+                self._send_notification(notify_target, title, message)
+            )
+
+    @staticmethod
+    def _format_expiry_date(dt_str: str | None) -> str:
+        """Format an ISO date string to DD.MM.YYYY for Romanian display."""
+        if not dt_str:
+            return "?"
+        try:
+            dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
+            return dt.strftime("%d.%m.%Y")
+        except (ValueError, TypeError):
+            return dt_str or "?"
 
     def _check_booking_suggestions(
         self,

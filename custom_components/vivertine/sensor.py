@@ -32,6 +32,7 @@ from .const import (
     SENSOR_ACTIVE_BOOKINGS,
     SENSOR_LATEST_NOTIFICATION,
     SENSOR_CLASS_BUDDIES,
+    SENSOR_GYM_BUSYNESS,
     BOOKING_WINDOW_HOURS,
     DATA_ACTIVE_CONTRACT,
     DATA_ACCOUNT,
@@ -49,6 +50,8 @@ from .const import (
     DATA_CLUB,
     DATA_NOTIFICATIONS,
     DATA_CLASS_BUDDIES,
+    DATA_GYM_BUSYNESS,
+    BUSYNESS_LABEL_FREE,
 )
 from .coordinator import VivertineDataUpdateCoordinator
 
@@ -326,6 +329,10 @@ class VivertineSensor(
                 return len(by_class[first_cid])
             return 0
 
+        if key == SENSOR_GYM_BUSYNESS:
+            busyness = data.get(DATA_GYM_BUSYNESS, {})
+            return busyness.get("label", BUSYNESS_LABEL_FREE)
+
         return None
 
     @property
@@ -523,6 +530,8 @@ class VivertineSensor(
                 for b in bookings_data
                 if not b.get("isCanceled", False)
             }
+            # Build set of upcoming class IDs for filtering
+            upcoming_cids = {c.get("id") for c in upcoming}
             # Find the next booked upcoming class
             next_booked_cls = None
             for cls in upcoming:
@@ -540,29 +549,51 @@ class VivertineSensor(
                 )
                 attrs["next_class_start"] = next_booked_cls.get("startDate")
                 attendees = by_class.get(next_cid, [])
-                attrs["who_is_going"] = attendees
+                attrs["who_is_going"] = attendees[:10]
+                attrs["who_is_going_total"] = len(attendees)
                 attrs["buddy_count"] = len(
                     [a for a in attendees if a.get("is_buddy")]
                 )
                 attrs["standby_count"] = len(
                     [a for a in attendees if a.get("is_standby")]
                 )
-            # Include all booked classes' attendee data
-            all_classes_data = []
+            # Only include UPCOMING booked classes (not past),
+            # capped at 5 classes with summary-only data to stay
+            # under the 16KB HA recorder attribute limit.
+            upcoming_classes_data = []
             for booked_cid in by_class:
+                if booked_cid not in upcoming_cids:
+                    continue
                 attendees = by_class[booked_cid]
-                all_classes_data.append(
+                upcoming_classes_data.append(
                     {
                         "class_id": booked_cid,
                         "attendee_count": len(attendees),
                         "buddy_count": len(
                             [a for a in attendees if a.get("is_buddy")]
                         ),
-                        "attendees": attendees[:20],  # cap per class
+                        "buddies": [
+                            a["name"]
+                            for a in attendees
+                            if a.get("is_buddy")
+                        ][:10],
                     }
                 )
-            attrs["booked_classes"] = all_classes_data
-            attrs["total_booked_classes"] = len(by_class)
+            attrs["booked_classes"] = upcoming_classes_data[:5]
+            attrs["total_booked_classes"] = len(
+                [c for c in by_class if c in upcoming_cids]
+            )
+
+        elif key == SENSOR_GYM_BUSYNESS:
+            busyness = data.get(DATA_GYM_BUSYNESS, {})
+            attrs["total_attendees"] = busyness.get("total_attendees", 0)
+            attrs["total_capacity"] = busyness.get("total_capacity", 0)
+            attrs["occupancy_percent"] = busyness.get(
+                "occupancy_percent", 0.0
+            )
+            attrs["classes_count"] = busyness.get("classes_count", 0)
+            attrs["window_hours"] = busyness.get("window_hours", 4)
+            attrs["classes"] = busyness.get("classes", [])
 
         return attrs
 

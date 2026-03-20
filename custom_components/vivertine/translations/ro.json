@@ -30,17 +30,23 @@
         "title": "Opțiuni Vivertine Gym",
         "data": {
           "update_interval": "Interval actualizare (secunde)",
-          "favorite_classes": "Clase favorite (separate prin virgulă)",
-          "favorite_instructors": "Instructori favoriți (separați prin virgulă)",
-          "notify_service": "Serviciu notificări",
-          "low_spots_threshold": "Prag alertă locuri puține"
+          "favorite_classes": "Clase favorite (separate prin virgula)",
+          "favorite_instructors": "Instructori favoriti (separati prin virgula)",
+          "notify_service": "Serviciu notificari",
+          "low_spots_threshold": "Prag alerta locuri putine",
+          "expiry_reminder_days": "Zile reminder expirare abonament",
+          "expiry_daily_threshold": "Prag reminder zilnic (zile)",
+          "busyness_window_hours": "Fereastra aglomeratie (ore)"
         },
         "data_description": {
-          "update_interval": "Cât de des să se actualizeze datele (60-3600 secunde)",
+          "update_interval": "Cat de des sa se actualizeze datele (60-3600 secunde)",
           "favorite_classes": "Numele claselor de monitorizat, ex: 'Cycling, Yoga, TRX'",
           "favorite_instructors": "Numele instructorilor de monitorizat, ex: 'Ana Popescu, Mihai Ion'",
-          "notify_service": "Numele serviciului de notificări HA, ex: 'mobile_app_iphone' (gol = dezactivat)",
-          "low_spots_threshold": "Alertă când locurile disponibile scad sub acest număr (1-30)"
+          "notify_service": "Numele serviciului de notificari HA, ex: 'mobile_app_iphone' (gol = dezactivat)",
+          "low_spots_threshold": "Alerta cand locurile disponibile scad sub acest numar (1-30)",
+          "expiry_reminder_days": "Zile inainte de expirare pentru remindere, separate prin virgula (ex: '60,30,14,7')",
+          "expiry_daily_threshold": "Trimite remindere zilnice cand zilele ramase sunt sub acest numar (1-30)",
+          "busyness_window_hours": "Fereastra de timp pentru estimarea aglomeratiei (1-8 ore)"
         }
       }
     }

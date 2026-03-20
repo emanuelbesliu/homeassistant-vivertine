@@ -18,10 +18,18 @@ from .const import (
     CONF_FAVORITE_INSTRUCTORS,
     CONF_NOTIFY_SERVICE,
     CONF_LOW_SPOTS_THRESHOLD,
+    CONF_EXPIRY_REMINDER_DAYS,
+    CONF_EXPIRY_DAILY_THRESHOLD,
+    CONF_BUSYNESS_WINDOW_HOURS,
     DEFAULT_UPDATE_INTERVAL,
     MIN_UPDATE_INTERVAL,
     MAX_UPDATE_INTERVAL,
     DEFAULT_LOW_SPOTS_THRESHOLD,
+    DEFAULT_EXPIRY_REMINDER_DAYS,
+    DEFAULT_EXPIRY_DAILY_THRESHOLD,
+    DEFAULT_BUSYNESS_WINDOW_HOURS,
+    MIN_BUSYNESS_WINDOW_HOURS,
+    MAX_BUSYNESS_WINDOW_HOURS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -140,6 +148,24 @@ class VivertineOptionsFlowHandler(config_entries.OptionsFlow):
                 CONF_LOW_SPOTS_THRESHOLD, DEFAULT_LOW_SPOTS_THRESHOLD
             ),
         )
+        current_expiry_days = self.config_entry.options.get(
+            CONF_EXPIRY_REMINDER_DAYS,
+            self.config_entry.data.get(
+                CONF_EXPIRY_REMINDER_DAYS, DEFAULT_EXPIRY_REMINDER_DAYS
+            ),
+        )
+        current_daily_threshold = self.config_entry.options.get(
+            CONF_EXPIRY_DAILY_THRESHOLD,
+            self.config_entry.data.get(
+                CONF_EXPIRY_DAILY_THRESHOLD, DEFAULT_EXPIRY_DAILY_THRESHOLD
+            ),
+        )
+        current_busyness_window = self.config_entry.options.get(
+            CONF_BUSYNESS_WINDOW_HOURS,
+            self.config_entry.data.get(
+                CONF_BUSYNESS_WINDOW_HOURS, DEFAULT_BUSYNESS_WINDOW_HOURS
+            ),
+        )
 
         options_schema = vol.Schema(
             {
@@ -170,6 +196,27 @@ class VivertineOptionsFlowHandler(config_entries.OptionsFlow):
                 ): vol.All(
                     vol.Coerce(int),
                     vol.Range(min=1, max=30),
+                ),
+                vol.Optional(
+                    CONF_EXPIRY_REMINDER_DAYS,
+                    default=current_expiry_days,
+                ): str,
+                vol.Optional(
+                    CONF_EXPIRY_DAILY_THRESHOLD,
+                    default=current_daily_threshold,
+                ): vol.All(
+                    vol.Coerce(int),
+                    vol.Range(min=1, max=30),
+                ),
+                vol.Optional(
+                    CONF_BUSYNESS_WINDOW_HOURS,
+                    default=current_busyness_window,
+                ): vol.All(
+                    vol.Coerce(int),
+                    vol.Range(
+                        min=MIN_BUSYNESS_WINDOW_HOURS,
+                        max=MAX_BUSYNESS_WINDOW_HOURS,
+                    ),
                 ),
             }
         )

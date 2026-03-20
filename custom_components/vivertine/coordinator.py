@@ -22,6 +22,13 @@ from .const import (
     CONF_UPDATE_INTERVAL,
     CONF_FAVORITE_CLASSES,
     CONF_FAVORITE_INSTRUCTORS,
+    CONF_BUSYNESS_WINDOW_HOURS,
+    DEFAULT_BUSYNESS_WINDOW_HOURS,
+    BUSYNESS_THRESHOLD_LOW,
+    BUSYNESS_THRESHOLD_HIGH,
+    BUSYNESS_LABEL_FREE,
+    BUSYNESS_LABEL_MODERATE,
+    BUSYNESS_LABEL_BUSY,
     CONTRACT_STATUS_CURRENT,
     DATA_ACCOUNT,
     DATA_CONTRACTS,
@@ -45,6 +52,7 @@ from .const import (
     DATA_MONTHLY_VISITS,
     DATA_NOTIFICATIONS,
     DATA_CLASS_BUDDIES,
+    DATA_GYM_BUSYNESS,
     VIVERTINE_CLUB_ID,
 )
 
@@ -202,6 +210,9 @@ class VivertineDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             who_is_in, bookings, classes_visits, account
         )
 
+        # -- Gym busyness (proxy from class attendees) --
+        gym_busyness = self._compute_gym_busyness(enriched_classes)
+
         return {
             DATA_ACCOUNT: account,
             DATA_CONTRACTS: contracts,
@@ -225,6 +236,7 @@ class VivertineDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             DATA_MONTHLY_VISITS: monthly_visits,
             DATA_NOTIFICATIONS: notifications,
             DATA_CLASS_BUDDIES: class_buddies,
+            DATA_GYM_BUSYNESS: gym_busyness,
         }
 
     # ------------------------------------------------------------------
@@ -758,6 +770,99 @@ class VivertineDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "next_booked_attendee_count": next_booked_count,
             "by_class": by_class,
             "buddies_by_class": buddies_by_class,
+        }
+
+    # ------------------------------------------------------------------
+    # Gym busyness estimation
+    # ------------------------------------------------------------------
+
+    def _compute_gym_busyness(
+        self, classes: list[dict[str, Any]]
+    ) -> dict[str, Any]:
+        """Estimate gym busyness from class attendees in a time window.
+
+        Vivertine's real occupancy API returns null, so we use the sum of
+        attendeesCount / attendeesLimit for classes starting within the
+        configured window as a proxy for how busy the gym will be.
+
+        Returns a dict with:
+            label: str          — Liber / Moderat / Aglomerat
+            total_attendees: int
+            total_capacity: int
+            occupancy_percent: float
+            classes_count: int
+            classes: list[dict] — per-class breakdown (capped at 10)
+        """
+        window_hours = self.entry.options.get(
+            CONF_BUSYNESS_WINDOW_HOURS,
+            self.entry.data.get(
+                CONF_BUSYNESS_WINDOW_HOURS, DEFAULT_BUSYNESS_WINDOW_HOURS
+            ),
+        )
+
+        now = datetime.now()
+        window_end = now + timedelta(hours=window_hours)
+
+        total_attendees = 0
+        total_capacity = 0
+        class_breakdown: list[dict[str, Any]] = []
+
+        for cls in classes:
+            if cls.get("isDeleted"):
+                continue
+            start_str = cls.get("startDate")
+            if not start_str:
+                continue
+            try:
+                start_dt = datetime.fromisoformat(
+                    start_str.replace("Z", "+00:00")
+                ).replace(tzinfo=None)
+            except (ValueError, TypeError):
+                continue
+
+            # Only consider classes within the window (future only)
+            if start_dt < now or start_dt > window_end:
+                continue
+
+            attendees = cls.get("attendeesCount", 0) or 0
+            limit = cls.get("attendeesLimit", 0) or 0
+            total_attendees += attendees
+            total_capacity += limit
+
+            class_breakdown.append(
+                {
+                    "class_name": cls.get("class_type_name", "Unknown"),
+                    "instructor": cls.get("instructor_name", "N/A"),
+                    "start": start_str,
+                    "attendees": attendees,
+                    "capacity": limit,
+                }
+            )
+
+        # Compute occupancy percentage
+        if total_capacity > 0:
+            occupancy_pct = round(
+                (total_attendees / total_capacity) * 100, 1
+            )
+        else:
+            occupancy_pct = 0.0
+
+        # Determine categorical label
+        if occupancy_pct < BUSYNESS_THRESHOLD_LOW:
+            label = BUSYNESS_LABEL_FREE
+        elif occupancy_pct <= BUSYNESS_THRESHOLD_HIGH:
+            label = BUSYNESS_LABEL_MODERATE
+        else:
+            label = BUSYNESS_LABEL_BUSY
+
+        return {
+            "label": label,
+            "total_attendees": total_attendees,
+            "total_capacity": total_capacity,
+            "occupancy_percent": occupancy_pct,
+            "classes_count": len(class_breakdown),
+            "window_hours": window_hours,
+            "classes": class_breakdown[:10],
         }
 
     @staticmethod
