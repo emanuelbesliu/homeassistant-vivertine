@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.16 (2026-03-20)
+
+### Added
+- **Gym busyness "Inchis" (Closed) state** — the `gym_busyness` sensor now shows `Inchis` when the gym is outside its opening hours, instead of calculating busyness from class data. Uses the `/v1/Clubs/OpeningHours` API to determine if the gym is currently open. New attributes: `is_open` (true/false), `open_from`, `open_until` (today's hours). Falls back to "assume open" if opening hours data is unavailable
+- **Persistent booking suggestion dedup** — dismissed booking suggestions ("Nu" button) are now persisted to disk via `homeassistant.helpers.storage.Store`. Previously, dismissed suggestions were lost on every HA restart/integration reload (in-memory `_sent_alerts` set). Now: if user tapped "Nu", the class ID is saved to `.storage/vivertine.dismissed_suggestions_{entry_id}` and never re-suggested. If user never responded, the suggestion re-sends after restart
+
+### Technical
+- New constant `BUSYNESS_LABEL_CLOSED = "Inchis"` in `const.py`
+- New constants `STORAGE_VERSION` and `STORAGE_KEY` in `const.py` for persistent storage
+- New static method `_is_gym_open()` in `coordinator.py` — filters opening hours by club ID, maps weekday to PerfectGym day names, handles `isClosed`/`isOpenTwentyFourHours`/`openTwentyFourSeven` flags
+- `_compute_gym_busyness()` now accepts `opening_hours` parameter and returns `Inchis` with zeroed stats when gym is closed
+- `alerts.py` now uses `Store` for persistent dismissed suggestions: `async_load_dismissed()` on startup, `async_dismiss_suggestion()` on "Nu" tap
+- `__init__.py` calls `await alerts.async_load_dismissed()` on setup and persists dismiss actions
+
 ## 1.0.15 (2026-03-20)
 
 ### Added

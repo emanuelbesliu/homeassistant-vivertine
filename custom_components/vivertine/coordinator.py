@@ -29,6 +29,7 @@ from .const import (
     BUSYNESS_LABEL_FREE,
     BUSYNESS_LABEL_MODERATE,
     BUSYNESS_LABEL_BUSY,
+    BUSYNESS_LABEL_CLOSED,
     CONTRACT_STATUS_CURRENT,
     DATA_ACCOUNT,
     DATA_CONTRACTS,
@@ -211,7 +212,9 @@ class VivertineDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
 
         # -- Gym busyness (proxy from class attendees) --
-        gym_busyness = self._compute_gym_busyness(enriched_classes)
+        gym_busyness = self._compute_gym_busyness(
+            enriched_classes, opening_hours
+        )
 
         return {
             DATA_ACCOUNT: account,
@@ -776,8 +779,79 @@ class VivertineDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # Gym busyness estimation
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _is_gym_open(
+        opening_hours: list[dict[str, Any]],
+        now: datetime,
+    ) -> tuple[bool, str | None, str | None]:
+        """Check if the gym is currently open based on opening hours.
+
+        Filters opening hours by VIVERTINE_CLUB_ID and matches
+        today's day of week.
+
+        Returns:
+            (is_open, open_from, open_until) — times as "HH:MM" or None
+        """
+        # Map Python weekday() to PerfectGym dayOfWeekOrHoliday
+        day_map = {
+            0: "Monday",
+            1: "Tuesday",
+            2: "Wednesday",
+            3: "Thursday",
+            4: "Friday",
+            5: "Saturday",
+            6: "Sunday",
+        }
+        today_name = day_map.get(now.weekday())
+
+        for entry in opening_hours:
+            if entry.get("isDeleted"):
+                continue
+            if entry.get("clubId") != VIVERTINE_CLUB_ID:
+                continue
+            if entry.get("dayOfWeekOrHoliday") != today_name:
+                continue
+
+            # Found today's entry for our club
+            if entry.get("isClosed"):
+                return (False, None, None)
+
+            if entry.get("isOpenTwentyFourHours") or entry.get(
+                "openTwentyFourSeven"
+            ):
+                return (True, "00:00", "23:59")
+
+            open_from = entry.get("openFrom")
+            open_until = entry.get("openUntil")
+
+            if not open_from or not open_until:
+                # Data missing — assume open to avoid false "Inchis"
+                return (True, open_from, open_until)
+
+            # Parse HH:MM and compare to current time
+            try:
+                from_h, from_m = (int(x) for x in open_from.split(":"))
+                until_h, until_m = (int(x) for x in open_until.split(":"))
+                open_time = now.replace(
+                    hour=from_h, minute=from_m, second=0, microsecond=0
+                )
+                close_time = now.replace(
+                    hour=until_h, minute=until_m, second=0, microsecond=0
+                )
+                is_open = open_time <= now <= close_time
+            except (ValueError, TypeError):
+                # Parse error — assume open
+                is_open = True
+
+            return (is_open, open_from, open_until)
+
+        # No matching entry found — assume open (no data = don't restrict)
+        return (True, None, None)
+
     def _compute_gym_busyness(
-        self, classes: list[dict[str, Any]]
+        self,
+        classes: list[dict[str, Any]],
+        opening_hours: list[dict[str, Any]],
     ) -> dict[str, Any]:
         """Estimate gym busyness from class attendees in a time window.
 
@@ -785,12 +859,19 @@ class VivertineDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         attendeesCount / attendeesLimit for classes starting within the
         configured window as a proxy for how busy the gym will be.
 
+        If the gym is currently closed (based on opening hours from the API),
+        returns "Inchis" (Closed) as the label.
+
         Returns a dict with:
-            label: str          — Liber / Moderat / Aglomerat
+            label: str          — Inchis / Liber / Moderat / Aglomerat
             total_attendees: int
             total_capacity: int
             occupancy_percent: float
             classes_count: int
+            window_hours: int
+            is_open: bool
+            open_from: str | None
+            open_until: str | None
             classes: list[dict] — per-class breakdown (capped at 10)
         """
         window_hours = self.entry.options.get(
@@ -801,6 +882,26 @@ class VivertineDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
 
         now = datetime.now()
+
+        # Check if gym is currently open
+        is_open, open_from, open_until = self._is_gym_open(
+            opening_hours, now
+        )
+
+        if not is_open:
+            return {
+                "label": BUSYNESS_LABEL_CLOSED,
+                "total_attendees": 0,
+                "total_capacity": 0,
+                "occupancy_percent": 0.0,
+                "classes_count": 0,
+                "window_hours": window_hours,
+                "is_open": False,
+                "open_from": open_from,
+                "open_until": open_until,
+                "classes": [],
+            }
+
         window_end = now + timedelta(hours=window_hours)
 
         total_attendees = 0
@@ -862,6 +963,9 @@ class VivertineDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "occupancy_percent": occupancy_pct,
             "classes_count": len(class_breakdown),
             "window_hours": window_hours,
+            "is_open": True,
+            "open_from": open_from,
+            "open_until": open_until,
             "classes": class_breakdown[:10],
         }
 

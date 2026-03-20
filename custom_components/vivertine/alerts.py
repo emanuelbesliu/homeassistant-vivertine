@@ -8,6 +8,11 @@ Monitors favorite classes for changes and fires HA events + notifications:
 
 Uses a snapshot-comparison approach: each coordinator update, we compare
 the current class data against the previous snapshot to detect changes.
+
+Booking suggestions use persistent storage (homeassistant.helpers.storage.Store)
+so that dismissed suggestions survive HA restarts. If the user tapped "Nu" (No)
+on a suggestion, that class ID is persisted and never re-suggested. If the user
+never responded, the suggestion is re-sent after restart.
 """
 
 import logging
@@ -16,6 +21,7 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import (
@@ -30,6 +36,8 @@ from .const import (
     DEFAULT_EXPIRY_REMINDER_DAYS,
     DEFAULT_EXPIRY_DAILY_THRESHOLD,
     BOOKING_WINDOW_HOURS,
+    STORAGE_VERSION,
+    STORAGE_KEY,
     EVENT_CLASS_CANCELLED,
     EVENT_CLASS_MOVED,
     EVENT_CLASS_INSTRUCTOR_CHANGED,
@@ -64,8 +72,16 @@ class VivertineClassAlerts:
         # Previous snapshot of classes keyed by class ID
         self._previous_classes: dict[int, dict[str, Any]] = {}
         # Track which alerts have already been sent to avoid duplicates
+        # (in-memory only — cleared on restart, used for non-suggestion alerts)
         self._sent_alerts: set[str] = set()
         self._unsub: Any = None
+        # Persistent storage for dismissed booking suggestions.
+        # Class IDs the user explicitly dismissed ("Nu") survive restarts.
+        self._store = Store(
+            hass, STORAGE_VERSION, f"{STORAGE_KEY}_{entry.entry_id}"
+        )
+        self._dismissed_suggestions: set[int] = set()
+        self._dismissed_loaded = False
 
     @property
     def _favorite_names(self) -> set[str]:
@@ -153,6 +169,33 @@ class VivertineClassAlerts:
         if self._unsub:
             self._unsub()
             self._unsub = None
+
+    async def async_load_dismissed(self) -> None:
+        """Load dismissed suggestion class IDs from persistent storage."""
+        data = await self._store.async_load()
+        if data and isinstance(data, dict):
+            dismissed = data.get("dismissed", [])
+            self._dismissed_suggestions = {
+                int(cid) for cid in dismissed if str(cid).isdigit()
+            }
+            _LOGGER.debug(
+                "Loaded %d dismissed suggestions from storage",
+                len(self._dismissed_suggestions),
+            )
+        self._dismissed_loaded = True
+
+    async def async_dismiss_suggestion(self, class_id: int) -> None:
+        """Persistently dismiss a booking suggestion so it survives restarts."""
+        self._dismissed_suggestions.add(class_id)
+        self._sent_alerts.add(f"suggest_{class_id}")
+        await self._store.async_save(
+            {"dismissed": list(self._dismissed_suggestions)}
+        )
+        _LOGGER.debug(
+            "Persisted dismissed suggestion for class %s (total: %d)",
+            class_id,
+            len(self._dismissed_suggestions),
+        )
 
     def send_test_notification(self) -> None:
         """Send a test notification to verify the alert pipeline works."""
@@ -678,9 +721,11 @@ class VivertineClassAlerts:
                 except (ValueError, TypeError):
                     pass  # keep candidate if we can't parse date
 
-            # Skip already suggested
+            # Skip already suggested (in-memory) or persistently dismissed
             alert_key = f"suggest_{cls_id}"
             if alert_key in self._sent_alerts:
+                continue
+            if cls_id in self._dismissed_suggestions:
                 continue
             self._sent_alerts.add(alert_key)
 

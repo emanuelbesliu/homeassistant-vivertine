@@ -52,6 +52,7 @@ from .const import (
     DATA_CLASS_BUDDIES,
     DATA_GYM_BUSYNESS,
     BUSYNESS_LABEL_FREE,
+    BUSYNESS_LABEL_CLOSED,
 )
 from .coordinator import VivertineDataUpdateCoordinator
 
@@ -331,7 +332,7 @@ class VivertineSensor(
 
         if key == SENSOR_GYM_BUSYNESS:
             busyness = data.get(DATA_GYM_BUSYNESS, {})
-            return busyness.get("label", BUSYNESS_LABEL_FREE)
+            return busyness.get("label", BUSYNESS_LABEL_CLOSED)
 
         return None
 
@@ -586,6 +587,9 @@ class VivertineSensor(
 
         elif key == SENSOR_GYM_BUSYNESS:
             busyness = data.get(DATA_GYM_BUSYNESS, {})
+            attrs["is_open"] = busyness.get("is_open", True)
+            attrs["open_from"] = busyness.get("open_from")
+            attrs["open_until"] = busyness.get("open_until")
             attrs["total_attendees"] = busyness.get("total_attendees", 0)
             attrs["total_capacity"] = busyness.get("total_capacity", 0)
             attrs["occupancy_percent"] = busyness.get(

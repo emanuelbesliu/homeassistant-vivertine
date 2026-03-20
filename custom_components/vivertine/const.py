@@ -56,6 +56,7 @@ BUSYNESS_THRESHOLD_HIGH = 70  # 30-70% = Moderat, >70% = Aglomerat
 BUSYNESS_LABEL_FREE = "Liber"
 BUSYNESS_LABEL_MODERATE = "Moderat"
 BUSYNESS_LABEL_BUSY = "Aglomerat"
+BUSYNESS_LABEL_CLOSED = "Inchis"
 
 # Booking window — Vivertine/PerfectGym only allows bookings within this
 # many hours before the class starts. Attempts to book earlier are rejected.
@@ -72,6 +73,10 @@ EVENT_MEMBERSHIP_EXPIRY = f"{DOMAIN}_membership_expiry"
 # Actionable notification action prefixes
 ACTION_BOOK_PREFIX = "VIVERTINE_BOOK_"
 ACTION_DISMISS_PREFIX = "VIVERTINE_DISMISS_"
+
+# Persistent storage for dismissed booking suggestions
+STORAGE_VERSION = 1
+STORAGE_KEY = f"{DOMAIN}.dismissed_suggestions"
 
 # Data keys in coordinator.data
 DATA_ACCOUNT = "account"

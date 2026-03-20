@@ -88,6 +88,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Set up alerts for favorite class monitoring
     alerts = VivertineClassAlerts(hass, entry)
 
+    # Load dismissed booking suggestions from persistent storage
+    await alerts.async_load_dismissed()
+
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = {
         "coordinator": coordinator,
@@ -185,6 +188,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 "User dismissed booking suggestion for class %s",
                 class_id_str,
             )
+            # Persist the dismissal so it survives HA restarts
+            try:
+                dismissed_id = int(class_id_str)
+            except (ValueError, TypeError):
+                _LOGGER.warning(
+                    "Invalid class_id in dismiss action: %s", action
+                )
+                return
+            await alerts.async_dismiss_suggestion(dismissed_id)
 
     unsub_notification_action = hass.bus.async_listen(
         "mobile_app_notification_action", _handle_notification_action

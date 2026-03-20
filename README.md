@@ -24,8 +24,8 @@ Custom Home Assistant integration for **Vivertine Gym** (Iași, Romania), built 
   - Instructor changed
   - Available spots below threshold (default: 5)
 - **Membership expiry notifications** — configurable reminders at milestone days before expiry, plus daily alerts when close to expiring
-- **Gym busyness** — estimates current gym busyness from class attendee counts (Liber/Moderat/Aglomerat)
-- **Actionable booking suggestions** — push notifications with "Book" / "Dismiss" buttons when recommended or favorite classes have spots available, with buddy info included
+- **Gym busyness** — estimates current gym busyness from class attendee counts (Inchis/Liber/Moderat/Aglomerat), shows "Inchis" outside opening hours
+- **Actionable booking suggestions** — push notifications with "Book" / "Dismiss" buttons when recommended or favorite classes have spots available, with buddy info included. Dismissed suggestions are persisted across restarts
 
 ## Installation
 
@@ -83,7 +83,7 @@ After setup, configure options via the integration's **Configure** button:
 | `sensor.vivertine_active_bookings` | Number of active class bookings |
 | `sensor.vivertine_latest_notification` | Latest gym notification subject/content |
 | `sensor.vivertine_class_buddies` | Attendees going to your next booked class (with buddy flags) |
-| `sensor.vivertine_gym_busyness` | Estimated gym busyness based on class attendees (Liber/Moderat/Aglomerat) |
+| `sensor.vivertine_gym_busyness` | Estimated gym busyness based on class attendees (Inchis/Liber/Moderat/Aglomerat) |
 | `sensor.vivertine_upcoming_schedule` | Full upcoming schedule (in attributes) |
 
 ### Class sensor display format
@@ -127,7 +127,8 @@ The `class_buddies` sensor shows who's signed up for your booked classes:
 
 The `gym_busyness` sensor estimates how busy the gym is based on class attendee counts in a configurable time window:
 
-- **State**: categorical label — `Liber` (<30%), `Moderat` (30-70%), `Aglomerat` (>70%) based on total attendees vs total capacity across all classes in the window
+- **State**: categorical label — `Inchis` (outside opening hours), `Liber` (<30%), `Moderat` (30-70%), `Aglomerat` (>70%) based on total attendees vs total capacity across all classes in the window
+- **Closed detection**: uses the `/v1/Clubs/OpeningHours` API to check if the gym is currently open. When closed, the state is `Inchis` with zeroed stats. Falls back to "assume open" if opening hours data is unavailable
 - **Window**: configurable via options (`busyness_window_hours`, default 4, range 1-8 hours from now)
 - **Attributes**:
   - `total_attendees` — sum of attendee counts across classes in the window
@@ -135,6 +136,9 @@ The `gym_busyness` sensor estimates how busy the gym is based on class attendee 
   - `occupancy_percent` — attendees/capacity as a percentage (0-100)
   - `classes_count` — number of classes in the window
   - `window_hours` — configured window size
+  - `is_open` — whether the gym is currently open (`true`/`false`)
+  - `open_from` — today's opening time (e.g., `"06:00"`) or `null` if closed all day
+  - `open_until` — today's closing time (e.g., `"23:00"`) or `null` if closed all day
   - `classes` — per-class breakdown (class name, instructor, time, attendees, capacity) capped at 10 entries
 - **Why class-based**: Vivertine's PerfectGym instance returns `null` for real occupancy endpoints, so class attendees in the near-future window is the best available proxy for gym activity
 
@@ -160,7 +164,8 @@ When the integration detects an unbooked class that matches your recommendations
   - **"Da, rezervă!"** — books the class automatically and sends a confirmation notification
   - **"Nu"** — dismisses the suggestion
 - **Deduplication**: if multiple recommendation types point to the same class, only one notification is sent with combined reasons
-- **Filters**: skips already-booked classes, classes with no spots, classes already suggested this session, and classes more than 24 hours away (outside booking window)
+- **Persistent dismiss**: if you tap "Nu" to dismiss a suggestion, that class is permanently dismissed — it will never be re-suggested, even after HA restarts or integration reloads. Dismissed class IDs are stored in `.storage/vivertine.dismissed_suggestions_{entry_id}`. If you never responded to a suggestion, it will re-send after restart
+- **Filters**: skips already-booked classes, classes with no spots, classes already suggested this session, permanently dismissed classes, and classes more than 24 hours away (outside booking window)
 - **Requires**: a notification service configured in the integration options (e.g., `mobile_app_iphone`)
 - **Works on**: iOS and Android via the HA Companion App
 
