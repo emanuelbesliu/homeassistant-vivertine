@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.4 (2026-03-20)
+
+### Added
+- Add Vivertine brand icon for HA integration UI (`custom_components/vivertine/brand/icon.png` and `icon@2x.png`)
+
 ## 1.0.3 (2026-03-20)
 
 ### Fixed
