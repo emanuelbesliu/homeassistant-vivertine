@@ -44,5 +44,31 @@
         }
       }
     }
+  },
+  "services": {
+    "send_test_notification": {
+      "name": "Trimite Notificare Test",
+      "description": "Trimite o notificare de test pentru a verifica sistemul de alerte Vivertine."
+    },
+    "book_class": {
+      "name": "Rezervă Clasă",
+      "description": "Rezervă o clasă la Vivertine folosind ID-ul clasei.",
+      "fields": {
+        "class_id": {
+          "name": "ID Clasă",
+          "description": "ID-ul numeric al clasei de rezervat."
+        }
+      }
+    },
+    "cancel_booking": {
+      "name": "Anulează Rezervarea",
+      "description": "Anulează o rezervare existentă folosind ID-ul rezervării.",
+      "fields": {
+        "class_booking_id": {
+          "name": "ID Rezervare",
+          "description": "ID-ul numeric al rezervării de anulat."
+        }
+      }
+    }
   }
 }

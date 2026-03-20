@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.9 (2026-03-20)
+
+### Added
+- **Gym Occupancy** sensors: real-time people count (`gym_occupancy`), club capacity limit (`gym_capacity`), and computed occupancy percentage (`gym_occupancy_percent`) — data from PerfectGym `WhoIsInCount` and `Limits` APIs
+- **Latest Gym Notification** sensor (`latest_notification`): shows the most recent gym notification subject/content, with full list of recent notifications in attributes
+- **Class Booking** services:
+  - `vivertine.book_class` — book a class by its class ID (triggers coordinator refresh after booking)
+  - `vivertine.cancel_booking` — cancel a booking by its booking ID (triggers coordinator refresh after cancellation)
+- Service descriptions in `strings.json` and translations (English + Romanian)
+
+### Changed
+- Service constants (`SERVICE_SEND_TEST_NOTIFICATION`, `SERVICE_BOOK_CLASS`, `SERVICE_CANCEL_BOOKING`) moved to `const.py` — removed inline definition in `__init__.py`
+- Occupancy and notification data fetches are fault-tolerant: failures log a debug message and continue without breaking the update cycle
+
 ## 1.0.8 (2026-03-20)
 
 ### Added

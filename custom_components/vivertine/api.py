@@ -22,6 +22,11 @@ from .const import (
     ENDPOINT_BOOKINGS,
     ENDPOINT_INSTRUCTORS,
     ENDPOINT_TIMELINE,
+    ENDPOINT_WHO_IS_IN_COUNT,
+    ENDPOINT_CLUB_LIMITS,
+    ENDPOINT_BOOK_CLASS,
+    ENDPOINT_CANCEL_BOOKING,
+    ENDPOINT_NOTIFICATIONS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -211,6 +216,73 @@ class VivertineAPI:
 
         return result
 
+    def _post(self, endpoint: str, payload: dict | None = None) -> Any:
+        """Make an authenticated POST request.
+
+        Raises:
+            VivertineAuthError: If token expired (HTTP 401).
+            VivertineApiError: On any other error.
+        """
+        if not self._token:
+            self.authenticate()
+
+        url = f"{API_BASE_URL}{endpoint}"
+        try:
+            resp = self._session.post(
+                url, json=payload, timeout=REQUEST_TIMEOUT
+            )
+        except requests.exceptions.Timeout as err:
+            raise VivertineApiError(
+                f"Timeout connecting to {endpoint}: {err}"
+            ) from err
+        except requests.exceptions.ConnectionError as err:
+            raise VivertineApiError(
+                f"Connection error to {endpoint}: {err}"
+            ) from err
+        except requests.exceptions.RequestException as err:
+            raise VivertineApiError(
+                f"Request error to {endpoint}: {err}"
+            ) from err
+
+        if resp.status_code == 401:
+            _LOGGER.debug("Got 401 on POST, attempting re-authentication")
+            self.authenticate()
+            try:
+                resp = self._session.post(
+                    url, json=payload, timeout=REQUEST_TIMEOUT
+                )
+            except requests.exceptions.RequestException as err:
+                raise VivertineApiError(
+                    f"Request error on retry to {endpoint}: {err}"
+                ) from err
+            if resp.status_code == 401:
+                raise VivertineAuthError(
+                    "Authentication failed after token refresh"
+                )
+
+        if resp.status_code != 200:
+            raise VivertineApiError(
+                f"HTTP {resp.status_code} from {endpoint}: {resp.text[:200]}"
+            )
+
+        try:
+            result = resp.json()
+        except ValueError as err:
+            raise VivertineApiError(
+                f"Invalid JSON from {endpoint}: {err}"
+            ) from err
+
+        # API wraps responses in {"data": ..., "errors": ...}
+        if isinstance(result, dict) and "data" in result:
+            errors = result.get("errors")
+            if errors:
+                _LOGGER.warning(
+                    "API returned errors from %s: %s", endpoint, errors
+                )
+            return result["data"]
+
+        return result
+
     # ------------------------------------------------------------------
     # Account & membership
     # ------------------------------------------------------------------
@@ -306,6 +378,59 @@ class VivertineAPI:
     def get_timeline(self) -> list[dict[str, Any]]:
         """Fetch user's timeline (club visits / check-ins)."""
         data = self._get(ENDPOINT_TIMELINE)
+        return data if isinstance(data, list) else []
+
+    # ------------------------------------------------------------------
+    # Gym occupancy
+    # ------------------------------------------------------------------
+
+    def get_who_is_in_count(self) -> list[dict[str, Any]]:
+        """Fetch real-time member count in each club."""
+        data = self._get(ENDPOINT_WHO_IS_IN_COUNT)
+        return data if isinstance(data, list) else []
+
+    def get_club_limits(self) -> list[dict[str, Any]]:
+        """Fetch club capacity limits and current occupancy."""
+        data = self._get(ENDPOINT_CLUB_LIMITS)
+        return data if isinstance(data, list) else []
+
+    # ------------------------------------------------------------------
+    # Class booking actions
+    # ------------------------------------------------------------------
+
+    def book_class(self, class_id: int) -> dict[str, Any]:
+        """Book a class by its ID.
+
+        Returns:
+            Dict with classBookingId and isStandBy.
+
+        Raises:
+            VivertineApiError: On booking failure.
+        """
+        payload = {"classId": class_id}
+        data = self._post(ENDPOINT_BOOK_CLASS, payload=payload)
+        return data if isinstance(data, dict) else {}
+
+    def cancel_booking(self, class_booking_id: int) -> dict[str, Any]:
+        """Cancel a class booking by its booking ID.
+
+        Returns:
+            Dict with classBookingId.
+
+        Raises:
+            VivertineApiError: On cancellation failure.
+        """
+        payload = {"classBookingId": class_booking_id}
+        data = self._post(ENDPOINT_CANCEL_BOOKING, payload=payload)
+        return data if isinstance(data, dict) else {}
+
+    # ------------------------------------------------------------------
+    # Notifications
+    # ------------------------------------------------------------------
+
+    def get_notifications(self) -> list[dict[str, Any]]:
+        """Fetch user's gym notifications (announcements, alerts)."""
+        data = self._get(ENDPOINT_NOTIFICATIONS)
         return data if isinstance(data, list) else []
 
     # ------------------------------------------------------------------

@@ -5,11 +5,17 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 
-from .api import VivertineAPI
+from .api import VivertineAPI, VivertineApiError
 from .alerts import VivertineClassAlerts
-from .const import DOMAIN, PLATFORMS, CONF_EMAIL, CONF_PASSWORD
-
-SERVICE_SEND_TEST_NOTIFICATION = "send_test_notification"
+from .const import (
+    DOMAIN,
+    PLATFORMS,
+    CONF_EMAIL,
+    CONF_PASSWORD,
+    SERVICE_SEND_TEST_NOTIFICATION,
+    SERVICE_BOOK_CLASS,
+    SERVICE_CANCEL_BOOKING,
+)
 from .coordinator import VivertineDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -58,6 +64,73 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             handle_send_test_notification,
         )
 
+    if not hass.services.has_service(DOMAIN, SERVICE_BOOK_CLASS):
+
+        async def handle_book_class(call: ServiceCall) -> None:
+            """Handle the book_class service call."""
+            class_id = call.data["class_id"]
+            # Use the first available entry's API instance
+            for eid, edata in hass.data.get(DOMAIN, {}).items():
+                api_inst = edata.get("api")
+                coord = edata.get("coordinator")
+                if api_inst:
+                    try:
+                        result = await hass.async_add_executor_job(
+                            api_inst.book_class, class_id
+                        )
+                        _LOGGER.info(
+                            "Booked class %s: %s", class_id, result
+                        )
+                    except VivertineApiError as err:
+                        _LOGGER.error(
+                            "Failed to book class %s: %s", class_id, err
+                        )
+                        raise
+                    if coord:
+                        await coord.async_request_refresh()
+                    break
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_BOOK_CLASS,
+            handle_book_class,
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_CANCEL_BOOKING):
+
+        async def handle_cancel_booking(call: ServiceCall) -> None:
+            """Handle the cancel_booking service call."""
+            class_booking_id = call.data["class_booking_id"]
+            for eid, edata in hass.data.get(DOMAIN, {}).items():
+                api_inst = edata.get("api")
+                coord = edata.get("coordinator")
+                if api_inst:
+                    try:
+                        result = await hass.async_add_executor_job(
+                            api_inst.cancel_booking, class_booking_id
+                        )
+                        _LOGGER.info(
+                            "Cancelled booking %s: %s",
+                            class_booking_id,
+                            result,
+                        )
+                    except VivertineApiError as err:
+                        _LOGGER.error(
+                            "Failed to cancel booking %s: %s",
+                            class_booking_id,
+                            err,
+                        )
+                        raise
+                    if coord:
+                        await coord.async_request_refresh()
+                    break
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_CANCEL_BOOKING,
+            handle_cancel_booking,
+        )
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
@@ -79,9 +152,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         api = data["api"]
         await hass.async_add_executor_job(api.close)
 
-        # Remove service when last entry is unloaded
+        # Remove services when last entry is unloaded
         if not hass.data[DOMAIN]:
             hass.services.async_remove(DOMAIN, SERVICE_SEND_TEST_NOTIFICATION)
+            hass.services.async_remove(DOMAIN, SERVICE_BOOK_CLASS)
+            hass.services.async_remove(DOMAIN, SERVICE_CANCEL_BOOKING)
 
     return unload_ok
 

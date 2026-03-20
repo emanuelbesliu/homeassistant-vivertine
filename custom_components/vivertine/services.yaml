@@ -5,3 +5,35 @@ send_test_notification:
     Creates a persistent notification and sends a push notification via the
     configured notify service (if set in options).
   fields: {}
+
+book_class:
+  name: Book Class
+  description: >-
+    Book a class at Vivertine gym by its class ID. Check the upcoming schedule
+    sensor attributes for available class IDs.
+  fields:
+    class_id:
+      name: Class ID
+      description: The numeric ID of the class to book.
+      required: true
+      example: 123456
+      selector:
+        number:
+          min: 1
+          mode: box
+
+cancel_booking:
+  name: Cancel Booking
+  description: >-
+    Cancel an existing class booking by its booking ID. Check the active
+    bookings sensor attributes for booking IDs.
+  fields:
+    class_booking_id:
+      name: Class Booking ID
+      description: The numeric ID of the booking to cancel.
+      required: true
+      example: 654321
+      selector:
+        number:
+          min: 1
+          mode: box

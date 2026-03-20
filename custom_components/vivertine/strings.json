@@ -44,5 +44,31 @@
         }
       }
     }
+  },
+  "services": {
+    "send_test_notification": {
+      "name": "Send Test Notification",
+      "description": "Send a test notification to verify the Vivertine alert system is working."
+    },
+    "book_class": {
+      "name": "Book Class",
+      "description": "Book a class at Vivertine gym by its class ID.",
+      "fields": {
+        "class_id": {
+          "name": "Class ID",
+          "description": "The numeric ID of the class to book."
+        }
+      }
+    },
+    "cancel_booking": {
+      "name": "Cancel Booking",
+      "description": "Cancel an existing class booking by its booking ID.",
+      "fields": {
+        "class_booking_id": {
+          "name": "Class Booking ID",
+          "description": "The numeric ID of the booking to cancel."
+        }
+      }
+    }
   }
 }

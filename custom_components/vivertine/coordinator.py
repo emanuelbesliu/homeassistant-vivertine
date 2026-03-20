@@ -43,6 +43,9 @@ from .const import (
     DATA_RECOMMENDED_CLASS,
     DATA_WEEKLY_VISITS,
     DATA_MONTHLY_VISITS,
+    DATA_GYM_OCCUPANCY,
+    DATA_GYM_CAPACITY,
+    DATA_NOTIFICATIONS,
     VIVERTINE_CLUB_ID,
 )
 
@@ -145,6 +148,43 @@ class VivertineDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         opening_hours = self.api.get_opening_hours()
 
+        # -- Gym occupancy --
+        occupancy_count: int | None = None
+        gym_capacity: int | None = None
+        try:
+            who_is_in = self.api.get_who_is_in_count()
+            for entry in who_is_in:
+                if entry.get("clubId") == VIVERTINE_CLUB_ID:
+                    occupancy_count = entry.get("count")
+                    break
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug("Failed to fetch WhoIsInCount, continuing")
+
+        try:
+            club_limits = self.api.get_club_limits()
+            for entry in club_limits:
+                if entry.get("clubId") == VIVERTINE_CLUB_ID:
+                    gym_capacity = entry.get("limit")
+                    # Fallback: use currentlyInClubCount if primary is None
+                    if occupancy_count is None:
+                        occupancy_count = entry.get("currentlyInClubCount")
+                    break
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug("Failed to fetch ClubLimits, continuing")
+
+        # -- Gym notifications --
+        notifications: list[dict[str, Any]] = []
+        try:
+            raw_notifications = self.api.get_notifications()
+            # Filter deleted and sort by sentDate descending
+            notifications = sorted(
+                [n for n in raw_notifications if not n.get("isDeleted")],
+                key=lambda n: n.get("sentDate", ""),
+                reverse=True,
+            )
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug("Failed to fetch notifications, continuing")
+
         # -- Enrich data --
         enriched_classes = self._enrich_classes(classes)
         active_contract = self._find_active_contract(contracts)
@@ -196,6 +236,9 @@ class VivertineDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             DATA_RECOMMENDED_CLASS: recommended_class,
             DATA_WEEKLY_VISITS: weekly_visits,
             DATA_MONTHLY_VISITS: monthly_visits,
+            DATA_GYM_OCCUPANCY: occupancy_count,
+            DATA_GYM_CAPACITY: gym_capacity,
+            DATA_NOTIFICATIONS: notifications,
         }
 
     # ------------------------------------------------------------------
