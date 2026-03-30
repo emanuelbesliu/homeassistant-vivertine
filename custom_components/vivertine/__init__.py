@@ -107,6 +107,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         """Handle mobile_app_notification_action events for booking suggestions."""
         action = event.data.get("action", "")
 
+        # Skip events not meant for this integration
+        if not action.startswith("VIVERTINE_"):
+            return
+
+        _LOGGER.debug(
+            "Received mobile_app_notification_action: action=%s, "
+            "full_event_data=%s",
+            action,
+            event.data,
+        )
+
+        try:
+            await _process_notification_action(action)
+        except Exception:  # noqa: BLE001
+            _LOGGER.exception(
+                "Unexpected error handling notification action: %s", action
+            )
+
+    async def _process_notification_action(action: str) -> None:
+        """Process a Vivertine notification action (book/snooze/dismiss)."""
         if action.startswith(ACTION_BOOK_PREFIX):
             class_id_str = action[len(ACTION_BOOK_PREFIX):]
             try:
@@ -213,6 +233,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 )
                 return
             alerts.async_snooze_suggestion(snoozed_id)
+
+        else:
+            _LOGGER.warning(
+                "Unknown Vivertine notification action: %s", action
+            )
 
     unsub_notification_action = hass.bus.async_listen(
         "mobile_app_notification_action", _handle_notification_action

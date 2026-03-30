@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.19 (2026-03-30)
+
+### Fixed
+- **Debug booking button on iOS** — added comprehensive logging and exception handling to the `mobile_app_notification_action` event handler to diagnose why the "Da, rezerva!" button was not working on iOS. The handler previously had no top-level exception guard, meaning any unexpected error would be silently swallowed by HA's event bus with no log output
+
+### Technical
+- Added early-exit guard for non-`VIVERTINE_` actions — avoids unnecessary debug logging for events from other integrations
+- Added debug log at handler entry with full `action` value and raw `event.data` — confirms whether iOS actually fires the event and what action string it sends
+- Wrapped the entire handler in a top-level `try/except Exception` with `_LOGGER.exception()` — any crash is now logged with full traceback instead of being silently eaten
+- Extracted action processing into `_process_notification_action()` inner function for cleaner exception boundary
+- Added `else` branch logging for unrecognized `VIVERTINE_*` action prefixes
+
 ## 1.0.18 (2026-03-20)
 
 ### Changed
