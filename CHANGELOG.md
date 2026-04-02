@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.0.20 (2026-04-02)
+
+### Added
+- **Confirmation notifications for all notification actions** — every actionable notification response now sends a follow-up confirmation to the user's phone:
+  - **"Da, rezervă!"** (Book) — confirmation now includes the class name, instructor, and time (e.g., "Ai rezervat Yoga cu Ana @ 18:00.") instead of the generic "Clasa a fost rezervată cu succes."
+  - **"Nu"** (Dismiss) — new confirmation: "Ai respins sugestia pentru {class}. Nu vei mai primi această sugestie."
+  - **"Ma mai gandesc"** (Snooze) — new confirmation: "Ai amânat sugestia pentru {class}. Vei primi din nou sugestia peste 60 minute."
+- **Booking retry with backoff** — when the PerfectGym API rejects a booking (e.g. at the edge of the 24h window when the API isn't ready yet), the integration automatically retries up to 3 times with progressive delays (30s, 60s, 120s). Applies to both the notification "Da, rezervă!" button and the `vivertine.book_class` service. After all retries fail, the user receives a notification with the final error
+
+### Technical
+- New `_get_class_display_name()` helper in `__init__.py` — looks up class name, instructor, and start time from coordinator data for human-readable confirmation messages. Falls back to `clasa #{id}` if the class is not found in coordinator data
+- Added `DEFAULT_SNOOZE_COOLDOWN_SECONDS`, `BOOKING_RETRY_ATTEMPTS`, `BOOKING_RETRY_DELAYS` to imports in `__init__.py`
+- New constants in `const.py`: `BOOKING_RETRY_ATTEMPTS = 3`, `BOOKING_RETRY_DELAYS = (30, 60, 120)`
+- All confirmation notifications use the `tag` field (`vivertine_suggest_{class_id}`) to replace the original suggestion notification on iOS/Android
+- Retry loop uses `asyncio.sleep()` between attempts to avoid blocking the event loop
+
 ## 1.0.19 (2026-03-30)
 
 ### Fixed

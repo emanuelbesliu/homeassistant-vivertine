@@ -1,5 +1,6 @@
 """The Vivertine Gym integration."""
 
+import asyncio
 import logging
 from datetime import datetime, timedelta
 
@@ -22,6 +23,9 @@ from .const import (
     ACTION_BOOK_PREFIX,
     ACTION_DISMISS_PREFIX,
     ACTION_SNOOZE_PREFIX,
+    DEFAULT_SNOOZE_COOLDOWN_SECONDS,
+    BOOKING_RETRY_ATTEMPTS,
+    BOOKING_RETRY_DELAYS,
 )
 from .coordinator import VivertineDataUpdateCoordinator
 
@@ -71,6 +75,38 @@ def _check_booking_window(coordinator, class_id: int) -> str | None:
         )
 
     return None
+
+
+def _get_class_display_name(coordinator, class_id: int) -> str:
+    """Return a human-readable display name for a class, or a fallback."""
+    if not coordinator or not coordinator.data:
+        return f"clasa #{class_id}"
+
+    classes = coordinator.data.get(DATA_CLASSES, [])
+    for cls in classes:
+        if cls.get("id") == class_id:
+            name = cls.get("class_type_name", "")
+            instructor = cls.get("instructor_name", "")
+            start_str = cls.get("startDate")
+
+            parts = []
+            if name:
+                parts.append(name)
+            if instructor and instructor != "N/A":
+                parts.append(f"cu {instructor}")
+            if start_str:
+                try:
+                    start_dt = datetime.fromisoformat(
+                        start_str.replace("Z", "+00:00")
+                    ).replace(tzinfo=None)
+                    parts.append(f"@ {start_dt.strftime('%H:%M')}")
+                except (ValueError, TypeError):
+                    pass
+            if parts:
+                return " ".join(parts)
+            break
+
+    return f"clasa #{class_id}"
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -161,12 +197,45 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     )
                 return
 
-            try:
-                await hass.async_add_executor_job(api.book_class, class_id)
-                _LOGGER.info("Successfully booked class %s", class_id)
-            except VivertineApiError as err:
-                _LOGGER.error("Failed to book class %s: %s", class_id, err)
-                # Notify user of failure
+            # Attempt booking with retry + backoff
+            last_error: VivertineApiError | None = None
+            for attempt in range(BOOKING_RETRY_ATTEMPTS):
+                try:
+                    await hass.async_add_executor_job(
+                        api.book_class, class_id
+                    )
+                    _LOGGER.info(
+                        "Successfully booked class %s (attempt %d)",
+                        class_id,
+                        attempt + 1,
+                    )
+                    last_error = None
+                    break
+                except VivertineApiError as err:
+                    last_error = err
+                    _LOGGER.warning(
+                        "Booking attempt %d/%d for class %s failed: %s",
+                        attempt + 1,
+                        BOOKING_RETRY_ATTEMPTS,
+                        class_id,
+                        err,
+                    )
+                    if attempt < BOOKING_RETRY_ATTEMPTS - 1:
+                        delay = BOOKING_RETRY_DELAYS[attempt]
+                        _LOGGER.info(
+                            "Retrying booking for class %s in %ds",
+                            class_id,
+                            delay,
+                        )
+                        await asyncio.sleep(delay)
+
+            if last_error is not None:
+                _LOGGER.error(
+                    "Failed to book class %s after %d attempts: %s",
+                    class_id,
+                    BOOKING_RETRY_ATTEMPTS,
+                    last_error,
+                )
                 notify_target = entry.options.get(
                     CONF_NOTIFY_SERVICE,
                     entry.data.get(CONF_NOTIFY_SERVICE, ""),
@@ -177,7 +246,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                         notify_target,
                         {
                             "title": "Vivertine: Eroare rezervare",
-                            "message": f"Nu am putut rezerva clasa: {err}",
+                            "message": (
+                                f"Nu am putut rezerva clasa după "
+                                f"{BOOKING_RETRY_ATTEMPTS} încercări: "
+                                f"{last_error}"
+                            ),
                         },
                     )
                 return
@@ -191,12 +264,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 entry.data.get(CONF_NOTIFY_SERVICE, ""),
             )
             if notify_target:
+                display = _get_class_display_name(coordinator, class_id)
                 await hass.services.async_call(
                     "notify",
                     notify_target,
                     {
                         "title": "Vivertine: Rezervare confirmată!",
-                        "message": "Clasa a fost rezervată cu succes.",
+                        "message": f"Ai rezervat {display}.",
                         "data": {
                             "tag": f"vivertine_suggest_{class_id}",
                         },
@@ -219,6 +293,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 return
             await alerts.async_dismiss_suggestion(dismissed_id)
 
+            # Send confirmation notification
+            notify_target = entry.options.get(
+                CONF_NOTIFY_SERVICE,
+                entry.data.get(CONF_NOTIFY_SERVICE, ""),
+            )
+            if notify_target:
+                display = _get_class_display_name(coordinator, dismissed_id)
+                await hass.services.async_call(
+                    "notify",
+                    notify_target,
+                    {
+                        "title": "Vivertine: Sugestie respinsă",
+                        "message": (
+                            f"Ai respins sugestia pentru {display}. "
+                            "Nu vei mai primi această sugestie."
+                        ),
+                        "data": {
+                            "tag": f"vivertine_suggest_{dismissed_id}",
+                        },
+                    },
+                )
+
         elif action.startswith(ACTION_SNOOZE_PREFIX):
             class_id_str = action[len(ACTION_SNOOZE_PREFIX):]
             _LOGGER.info(
@@ -233,6 +329,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 )
                 return
             alerts.async_snooze_suggestion(snoozed_id)
+
+            # Send confirmation notification
+            notify_target = entry.options.get(
+                CONF_NOTIFY_SERVICE,
+                entry.data.get(CONF_NOTIFY_SERVICE, ""),
+            )
+            if notify_target:
+                display = _get_class_display_name(coordinator, snoozed_id)
+                snooze_minutes = DEFAULT_SNOOZE_COOLDOWN_SECONDS // 60
+                await hass.services.async_call(
+                    "notify",
+                    notify_target,
+                    {
+                        "title": "Vivertine: Sugestie amânată",
+                        "message": (
+                            f"Ai amânat sugestia pentru {display}. "
+                            f"Vei primi din nou sugestia peste "
+                            f"{snooze_minutes} minute."
+                        ),
+                        "data": {
+                            "tag": f"vivertine_suggest_{snoozed_id}",
+                        },
+                    },
+                )
 
         else:
             _LOGGER.warning(
@@ -283,18 +403,51 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                         )
                         raise VivertineApiError(window_error)
 
-                    try:
-                        result = await hass.async_add_executor_job(
-                            api_inst.book_class, class_id
-                        )
-                        _LOGGER.info(
-                            "Booked class %s: %s", class_id, result
-                        )
-                    except VivertineApiError as err:
+                    # Attempt booking with retry + backoff
+                    last_error: VivertineApiError | None = None
+                    for attempt in range(BOOKING_RETRY_ATTEMPTS):
+                        try:
+                            result = await hass.async_add_executor_job(
+                                api_inst.book_class, class_id
+                            )
+                            _LOGGER.info(
+                                "Booked class %s (attempt %d): %s",
+                                class_id,
+                                attempt + 1,
+                                result,
+                            )
+                            last_error = None
+                            break
+                        except VivertineApiError as err:
+                            last_error = err
+                            _LOGGER.warning(
+                                "Service booking attempt %d/%d for "
+                                "class %s failed: %s",
+                                attempt + 1,
+                                BOOKING_RETRY_ATTEMPTS,
+                                class_id,
+                                err,
+                            )
+                            if attempt < BOOKING_RETRY_ATTEMPTS - 1:
+                                delay = BOOKING_RETRY_DELAYS[attempt]
+                                _LOGGER.info(
+                                    "Retrying service booking for "
+                                    "class %s in %ds",
+                                    class_id,
+                                    delay,
+                                )
+                                await asyncio.sleep(delay)
+
+                    if last_error is not None:
                         _LOGGER.error(
-                            "Failed to book class %s: %s", class_id, err
+                            "Failed to book class %s after %d "
+                            "attempts: %s",
+                            class_id,
+                            BOOKING_RETRY_ATTEMPTS,
+                            last_error,
                         )
-                        raise
+                        raise last_error
+
                     if coord:
                         await coord.async_request_refresh()
                     break

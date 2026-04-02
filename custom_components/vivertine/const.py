@@ -79,6 +79,11 @@ ACTION_SNOOZE_PREFIX = "VIVERTINE_SNOOZE_"
 # won't re-appear for this many seconds.  Default 1 hour.
 DEFAULT_SNOOZE_COOLDOWN_SECONDS = 3600
 
+# Booking retry — when the API rejects a booking (e.g. at the edge of the
+# 24h window), retry up to this many times with progressive backoff.
+BOOKING_RETRY_ATTEMPTS = 3
+BOOKING_RETRY_DELAYS = (30, 60, 120)  # seconds between retries
+
 # Persistent storage for dismissed booking suggestions
 STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}.dismissed_suggestions"

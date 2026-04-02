@@ -161,8 +161,9 @@ When the integration detects an unbooked class that matches your recommendations
 - **Trigger**: every coordinator update (default 5 min), checks recommended, favorite class, and favorite instructor class
 - **Notification**: includes class name, instructor, time, reason (e.g., "Clasă recomandată + favorită"), and which buddies are going
 - **Buttons**:
-  - **"Da, rezervă!"** — books the class automatically and sends a confirmation notification
-  - **"Nu"** — dismisses the suggestion
+  - **"Da, rezervă!"** — books the class automatically and sends a confirmation notification with the class name
+  - **"Ma mai gandesc"** — snoozes the suggestion for 1 hour, then re-suggests on the next update. Sends a confirmation notification with the snooze duration
+  - **"Nu"** — permanently dismisses the suggestion and sends a confirmation notification
 - **Deduplication**: if multiple recommendation types point to the same class, only one notification is sent with combined reasons
 - **Persistent dismiss**: if you tap "Nu" to dismiss a suggestion, that class is permanently dismissed — it will never be re-suggested, even after HA restarts or integration reloads. Dismissed class IDs are stored in `.storage/vivertine.dismissed_suggestions_{entry_id}`. If you never responded to a suggestion, it will re-send after restart
 - **Filters**: skips already-booked classes, classes with no spots, classes already suggested this session, permanently dismissed classes, and classes more than 24 hours away (outside booking window)
@@ -177,6 +178,7 @@ Vivertine (PerfectGym) only allows class bookings within **24 hours** of the cla
 - **`vivertine.book_class` service** rejects attempts to book classes >24h away with a clear error message
 - **Notification "Da, rezervă!" button** validates the window before calling the API
 - **`bookable` attribute** on all class sensors and schedule entries shows `true`/`false` based on the 24h window
+- **Automatic retry** — if the API rejects a booking (e.g. at the edge of the 24h window), the integration retries up to 3 times with progressive backoff (30s, 60s, 120s) before reporting a failure
 
 ## Services
 
