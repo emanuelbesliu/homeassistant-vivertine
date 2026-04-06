@@ -36,7 +36,8 @@
           "low_spots_threshold": "Prag alerta locuri putine",
           "expiry_reminder_days": "Zile reminder expirare abonament",
           "expiry_daily_threshold": "Prag reminder zilnic (zile)",
-          "busyness_window_hours": "Fereastra aglomeratie (ore)"
+          "busyness_window_hours": "Fereastra aglomeratie (ore)",
+          "disable_persistent_notifications": "Dezactiveaza notificarile persistente HA"
         },
         "data_description": {
           "update_interval": "Cat de des sa se actualizeze datele (60-3600 secunde)",
@@ -46,7 +47,8 @@
           "low_spots_threshold": "Alerta cand locurile disponibile scad sub acest numar (1-30)",
           "expiry_reminder_days": "Zile inainte de expirare pentru remindere, separate prin virgula (ex: '60,30,14,7')",
           "expiry_daily_threshold": "Trimite remindere zilnice cand zilele ramase sunt sub acest numar (1-30)",
-          "busyness_window_hours": "Fereastra de timp pentru estimarea aglomeratiei (1-8 ore)"
+          "busyness_window_hours": "Fereastra de timp pentru estimarea aglomeratiei (1-8 ore)",
+          "disable_persistent_notifications": "Cand este activat, alertele sunt trimise doar pe telefon (fara panoul de notificari HA)"
         }
       }
     }

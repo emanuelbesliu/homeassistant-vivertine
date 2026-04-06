@@ -37,9 +37,11 @@ from .const import (
     CONF_LOW_SPOTS_THRESHOLD,
     CONF_EXPIRY_REMINDER_DAYS,
     CONF_EXPIRY_DAILY_THRESHOLD,
+    CONF_DISABLE_PERSISTENT_NOTIFICATIONS,
     DEFAULT_LOW_SPOTS_THRESHOLD,
     DEFAULT_EXPIRY_REMINDER_DAYS,
     DEFAULT_EXPIRY_DAILY_THRESHOLD,
+    DEFAULT_DISABLE_PERSISTENT_NOTIFICATIONS,
     BOOKING_WINDOW_HOURS,
     STORAGE_VERSION,
     STORAGE_KEY,
@@ -170,6 +172,17 @@ class VivertineClassAlerts:
             CONF_EXPIRY_DAILY_THRESHOLD,
             self._entry.data.get(
                 CONF_EXPIRY_DAILY_THRESHOLD, DEFAULT_EXPIRY_DAILY_THRESHOLD
+            ),
+        )
+
+    @property
+    def _persistent_notifications_disabled(self) -> bool:
+        """Check if persistent (HA) notifications are disabled."""
+        return self._entry.options.get(
+            CONF_DISABLE_PERSISTENT_NOTIFICATIONS,
+            self._entry.data.get(
+                CONF_DISABLE_PERSISTENT_NOTIFICATIONS,
+                DEFAULT_DISABLE_PERSISTENT_NOTIFICATIONS,
             ),
         )
 
@@ -500,20 +513,21 @@ class VivertineClassAlerts:
         )
 
         # Persistent notification
-        notification_id = (
-            f"vivertine_{event_type}_{cls_data.get('id', 'unknown')}"
-        )
-        self._hass.async_create_task(
-            self._hass.services.async_call(
-                "persistent_notification",
-                "create",
-                {
-                    "message": message,
-                    "title": f"Vivertine: {title}",
-                    "notification_id": notification_id,
-                },
+        if not self._persistent_notifications_disabled:
+            notification_id = (
+                f"vivertine_{event_type}_{cls_data.get('id', 'unknown')}"
             )
-        )
+            self._hass.async_create_task(
+                self._hass.services.async_call(
+                    "persistent_notification",
+                    "create",
+                    {
+                        "message": message,
+                        "title": f"Vivertine: {title}",
+                        "notification_id": notification_id,
+                    },
+                )
+            )
 
         # Mobile notification via configured service
         notify_target = self._notify_service
@@ -638,18 +652,19 @@ class VivertineClassAlerts:
         )
 
         # Persistent notification
-        notification_id = f"vivertine_expiry_{days_left}"
-        self._hass.async_create_task(
-            self._hass.services.async_call(
-                "persistent_notification",
-                "create",
-                {
-                    "message": message,
-                    "title": f"Vivertine: {title}",
-                    "notification_id": notification_id,
-                },
+        if not self._persistent_notifications_disabled:
+            notification_id = f"vivertine_expiry_{days_left}"
+            self._hass.async_create_task(
+                self._hass.services.async_call(
+                    "persistent_notification",
+                    "create",
+                    {
+                        "message": message,
+                        "title": f"Vivertine: {title}",
+                        "notification_id": notification_id,
+                    },
+                )
             )
-        )
 
         # Mobile notification
         notify_target = self._notify_service
@@ -829,18 +844,19 @@ class VivertineClassAlerts:
             )
 
             # Persistent notification
-            notification_id = f"vivertine_suggest_{cls_id}"
-            self._hass.async_create_task(
-                self._hass.services.async_call(
-                    "persistent_notification",
-                    "create",
-                    {
-                        "message": message,
-                        "title": f"Vivertine: {title}",
-                        "notification_id": notification_id,
-                    },
+            if not self._persistent_notifications_disabled:
+                notification_id = f"vivertine_suggest_{cls_id}"
+                self._hass.async_create_task(
+                    self._hass.services.async_call(
+                        "persistent_notification",
+                        "create",
+                        {
+                            "message": message,
+                            "title": f"Vivertine: {title}",
+                            "notification_id": notification_id,
+                        },
+                    )
                 )
-            )
 
             # Actionable mobile notification
             actions = [

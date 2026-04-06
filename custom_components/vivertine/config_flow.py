@@ -21,6 +21,7 @@ from .const import (
     CONF_EXPIRY_REMINDER_DAYS,
     CONF_EXPIRY_DAILY_THRESHOLD,
     CONF_BUSYNESS_WINDOW_HOURS,
+    CONF_DISABLE_PERSISTENT_NOTIFICATIONS,
     DEFAULT_UPDATE_INTERVAL,
     MIN_UPDATE_INTERVAL,
     MAX_UPDATE_INTERVAL,
@@ -28,6 +29,7 @@ from .const import (
     DEFAULT_EXPIRY_REMINDER_DAYS,
     DEFAULT_EXPIRY_DAILY_THRESHOLD,
     DEFAULT_BUSYNESS_WINDOW_HOURS,
+    DEFAULT_DISABLE_PERSISTENT_NOTIFICATIONS,
     MIN_BUSYNESS_WINDOW_HOURS,
     MAX_BUSYNESS_WINDOW_HOURS,
 )
@@ -166,6 +168,13 @@ class VivertineOptionsFlowHandler(config_entries.OptionsFlow):
                 CONF_BUSYNESS_WINDOW_HOURS, DEFAULT_BUSYNESS_WINDOW_HOURS
             ),
         )
+        current_disable_persistent = self.config_entry.options.get(
+            CONF_DISABLE_PERSISTENT_NOTIFICATIONS,
+            self.config_entry.data.get(
+                CONF_DISABLE_PERSISTENT_NOTIFICATIONS,
+                DEFAULT_DISABLE_PERSISTENT_NOTIFICATIONS,
+            ),
+        )
 
         options_schema = vol.Schema(
             {
@@ -218,6 +227,10 @@ class VivertineOptionsFlowHandler(config_entries.OptionsFlow):
                         max=MAX_BUSYNESS_WINDOW_HOURS,
                     ),
                 ),
+                vol.Optional(
+                    CONF_DISABLE_PERSISTENT_NOTIFICATIONS,
+                    default=current_disable_persistent,
+                ): bool,
             }
         )
 

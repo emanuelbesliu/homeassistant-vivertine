@@ -36,7 +36,8 @@
           "low_spots_threshold": "Low spots alert threshold",
           "expiry_reminder_days": "Expiry reminder days",
           "expiry_daily_threshold": "Daily reminders threshold (days)",
-          "busyness_window_hours": "Busyness window (hours)"
+          "busyness_window_hours": "Busyness window (hours)",
+          "disable_persistent_notifications": "Disable HA persistent notifications"
         },
         "data_description": {
           "update_interval": "How often to fetch new data (60-3600 seconds)",
@@ -46,7 +47,8 @@
           "low_spots_threshold": "Alert when available spots drop below this number (1-30)",
           "expiry_reminder_days": "Comma-separated days before expiry to send reminders (e.g. '60,30,14,7')",
           "expiry_daily_threshold": "Send daily reminders when days left is at or below this number (1-30)",
-          "busyness_window_hours": "Time window for gym busyness estimation (1-8 hours)"
+          "busyness_window_hours": "Time window for gym busyness estimation (1-8 hours)",
+          "disable_persistent_notifications": "When enabled, alerts are sent only to your phone (no HA notifications panel)"
         }
       }
     }

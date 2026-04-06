@@ -63,6 +63,7 @@ After setup, configure options via the integration's **Configure** button:
 | Expiry reminder days | Comma-separated day milestones for expiry reminders | 60,30,14,7 |
 | Expiry daily threshold | Send daily reminders when days left is below this | 7 |
 | Busyness window hours | Time window (1-8h) for gym busyness calculation | 4 |
+| Disable persistent notifications | Skip HA notifications panel, send only to phone | Off |
 
 ## Sensors
 
