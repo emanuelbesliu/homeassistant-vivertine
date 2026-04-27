@@ -2,7 +2,7 @@
 # This file is used by Dependabot to track dependency updates
 
 # Core dependencies (from manifest.json)
-requests>=2.31.0
+requests>=2.33.1
 
 # Development/testing dependencies (optional)
 # homeassistant>=2023.1.0  # Commented out as HA is the runtime environment
